@@ -6,7 +6,7 @@
 // trackMe's wording and tone (options.tone: brutal | honest | encouraging), about blocks done today vs options.goal.
 // While something plays on the computer the clock glides left and a frosted media panel (30 % wide) slides in on the
 // right; it leaves again after playback has been stopped for a short while.
-import { LOCALE, chime, clockPeriod, h, haptic, hour12, media, pad, quotaProviders, store, wxLines } from '../main.js';
+import { LOCALE, chime, clockPeriod, gotoPageRef, h, haptic, hour12, media, pad, quotaProviders, store, wxLines } from '../main.js';
 import { W } from '../registry.js';
 
 const FACES = ['playful', 'tall'];
@@ -33,6 +33,11 @@ function motive(tone, s) {
     brutal: 'Timer running. Finish the block before you touch your phone.',
     honest: 'Timer running.',
     encouraging: "You're studying. Keep going.",
+  });
+  if (s.paused) return pick({
+    brutal: 'Paused. The block is still waiting.',
+    honest: 'Timer paused.',
+    encouraging: 'Paused. Pick it back up when you are ready.',
   });
   if (s.running) return pick({
     brutal: 'Break. Stand up, then get back to it.',
@@ -104,12 +109,17 @@ W.standby = {
 
     const dayEl = h('b'), dateEl = h('span');
     const tempEl = h('div', 'sbx-temp');
-    const quotaEl = h('div', 'sbx-quota');
-    const side = h('div', 'sbx-side', h('div', 'sbx-day', dayEl, dateEl), tempEl, h('div', 'sbx-spacer'), quotaEl);
+    const blocksEl = h('div', 'sbx-blocks');
+    const side = h('div', 'sbx-side', h('div', 'sbx-day', dayEl, dateEl), tempEl, h('div', 'sbx-spacer'), blocksEl);
     stage.append(main, side);
 
     const focusBtn = h('button', 'sbx-focus');
     focusBtn.type = 'button';
+    // AI usage: one frosted pill bottom right (mirrors Focus); tap opens the AI quotas page
+    const aiBtn = h('button', 'sbx-ai');
+    aiBtn.type = 'button';
+    aiBtn.setAttribute('aria-label', 'AI usage');
+    aiBtn.addEventListener('click', () => { haptic(); gotoPageRef('ai'); });
 
     // the media player: a real media widget on frosted glass, created once and kept, so it slides instead of rebuilding
     const mediaBox = h('div', 'w w-media sbx-media');
@@ -123,7 +133,7 @@ W.standby = {
     art?.addEventListener('error', syncGlass);
     const mediaNeeds = mediaInst.needs || W.media.needs;
 
-    root.append(stage, focusBtn, mediaBox);
+    root.append(stage, focusBtn, aiBtn, mediaBox);
     box.append(root);
 
     const setFace = (f, animate) => {
@@ -211,7 +221,8 @@ W.standby = {
         const mm = Math.floor(secs / 60), ss = secs % 60;
         setDigits((mm < 10 ? ' ' : '') + String(Math.min(mm, 99)) + pad(ss));
         ap.textContent = '';
-        phaseEl.textContent = `${PHASE_LABEL[p.kind]}${p.kind === 'work' ? ` · ${p.block}/${conf.cycles}` : ''}${pomo.pausedAt ? ' · paused' : ''}`;
+        phaseEl.textContent = pomo.pausedAt ? 'Paused · tap to resume, hold to stop'
+          : `${PHASE_LABEL[p.kind]}${p.kind === 'work' ? ` · ${p.block}/${conf.cycles}` : ''}`;
         focusBtn.textContent = '■ Stop';
       } else {
         const H = now.getHours(), h12 = hour12();
@@ -221,29 +232,51 @@ W.standby = {
         phaseEl.textContent = '';
         focusBtn.textContent = `▶ Focus ${conf.workMin}`;
       }
-      const m = motive(tone, { running: !!p && !pomo.pausedAt, kind: p?.kind, lastEnd: log.lastEnd, today: log.today, goal });
+      // a running session keeps the panel out of the night screen until it ends or is paused
+      globalThis.__sbxFocusing = !!p && !pomo.pausedAt;
+      blocksEl.replaceChildren(h('span', 'sbx-b-ic', '◉'), h('span', '', `${log.today}/${goal}`));
+      const m = motive(tone, { paused: !!pomo?.pausedAt, running: !!p && !pomo.pausedAt, kind: p?.kind, lastEnd: log.lastEnd, today: log.today, goal });
       if (motiveEl.textContent !== m) motiveEl.textContent = m;
       dayEl.textContent = now.toLocaleDateString(LOCALE, { weekday: 'short' }).replace('.', '').toUpperCase();
       dateEl.textContent = ' ' + now.getDate();
     };
     const renderWeather = () => { const l = wxLines(); tempEl.textContent = l ? l.temp : ''; };
+    const ring = (pct, color) => {
+      const r = 15.9155, c = Math.max(0, Math.min(100, pct));
+      const el = h('span', 'sbx-ring');
+      el.innerHTML = `<svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="${r}" class="bg"/>` +
+        `<circle cx="18" cy="18" r="${r}" class="fg" stroke="${color}" stroke-dasharray="${c} 100" transform="rotate(-90 18 18)"/></svg>`;
+      return el;
+    };
+    const untilWords = (ms) => {
+      if (!(ms > 0)) return '';
+      const m = Math.round(ms / MIN);
+      return m < 60 ? `${m}m` : m < 48 * 60 ? `${Math.floor(m / 60)}h ${pad(m % 60)}m` : `${Math.round(m / 1440)}d`;
+    };
     const renderQuota = () => {
-      const p = quotaProviders().find((x) => String(x.id).split('@')[0] === 'claude');
-      const lim = p?.limits?.[0];
-      quotaEl.replaceChildren(...(lim ? [h('span', 'sbx-q-ic', '✳'), h('span', '', `${Math.round(lim.percent)}%`)] : []));
+      const items = quotaProviders().filter((x) => !x.error && x.limits?.length).slice(0, 2).map((p) => {
+        const lim = p.limits[0];
+        const pct = Math.round(lim.percent);
+        const color = pct >= 90 ? '#ff453a' : pct >= 70 ? '#ff9f0a' : '#30d158';
+        const name = String(p.id).split('@')[0] === 'claude' ? '✳' : (p.name || p.id).slice(0, 1);
+        return h('span', 'sbx-ai-item', ring(pct, color), h('span', 'sbx-ai-ic', name), h('b', '', `${pct}%`),
+          h('span', 'sbx-ai-reset', untilWords((lim.resetsAt || 0) - Date.now())));
+      });
+      aiBtn.hidden = items.length === 0;
+      aiBtn.replaceChildren(...items);
     };
 
     render(); renderWeather(); renderQuota(); syncMedia();
     return {
       needs: W.standby.needs,
       update(kind, background) {
-        if (kind === 'tick') { render(); syncMedia(); }
+        if (kind === 'tick') { render(); syncMedia(); if (new Date().getSeconds() === 0) renderQuota(); }
         else if (kind === 'state') syncMedia();
         else if (kind === 'weather') renderWeather();
         else if (kind === 'quotas') renderQuota();
         if (mediaNeeds.includes(kind)) { try { mediaInst.update?.(kind, background); } catch (e) { console.warn('standby media', e); } }
       },
-      destroy() { clearTimeout(holdTimer); try { mediaInst.destroy?.(); } catch (_) {} },
+      destroy() { globalThis.__sbxFocusing = false; clearTimeout(holdTimer); try { mediaInst.destroy?.(); } catch (_) {} },
     };
   },
 };

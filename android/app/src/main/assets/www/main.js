@@ -2613,7 +2613,7 @@ function reconcileUnreachableNight(now = new Date()) {
   const dark = darkRoom && cfg.display?.nightWhenDark === true;
   // a running rule can hold the night screen up (its "night" action): the agent's active list carries ids only, so match them against cfg.rules
   const ruleNight = (D.state?.rules || []).some((id) => (cfg.rules || []).some((r) => r.id === id && r.then === 'night'));
-  setNight((isNight(now) || dark || unreachable || ruleNight) && Date.now() > wakeUntil);
+  setNight((isNight(now) || dark || unreachable || ruleNight) && Date.now() > wakeUntil && !globalThis.__sbxFocusing); // local patch: a running StandBy focus session holds the night screen off
 }
 /**
  * Before widgets are built: a timer that ran out while the panel was closed rings during the build, so the night
