@@ -107,3 +107,11 @@ W.standby = {
     };
   },
 };
+
+// The agent keeps only widget types it knows (its catalog), so StandBy rides on the clock widget:
+// a clock with options.face = "playful" | "tall" becomes the StandBy clock; any other clock is unchanged.
+const plainClock = W.clock.create;
+W.clock.create = function (box, ctx) {
+  if (FACES.includes(ctx?.o?.face)) { box.classList.add('w-standby'); return W.standby.create(box, ctx); }
+  return plainClock.call(this, box, ctx);
+};
