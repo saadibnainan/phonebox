@@ -1932,6 +1932,23 @@ body.controls-top .ap-foot { order: -1; margin-bottom: 4px; }
 .w-lyrics:not(.timed):not(.plain) .ly-note { margin: auto; }
 .ly-credit { position: absolute; right: 10px; top: 9px; font-size: 9px; letter-spacing: .1em; color: var(--dim); }
 
-/* --- local patch (lavender-local): one-accent stats, square album art --- */
-:root { --cpu: #b794ff; --gpu: #b794ff; --ram: #b794ff; --net: #b794ff; --up: #d9c7ff; }
-.art-wrap { border-radius: 0; box-shadow: none; }
+/* --- local patch: Apple dark-mode scheme (Inter as the SF Pro stand-in, iOS system colours) --- */
+@font-face { font-family: "Inter"; src: url("fonts/InterVariable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+body { font-family: Inter, -apple-system, Roboto, system-ui, sans-serif; font-feature-settings: "cv11", "ss03", "tnum"; -webkit-font-smoothing: antialiased; }
+:root, body[data-theme] {
+  --bg: #000;                         /* systemBackground (dark) */
+  --card: #1c1c1e;                    /* secondarySystemBackground */
+  --card-hi: #2c2c2e;                 /* tertiarySystemBackground */
+  --line: rgba(84, 84, 88, .36);      /* separator */
+  --text: #fff;                       /* label */
+  --muted: rgba(235, 235, 245, .6);   /* secondaryLabel */
+  --dim: rgba(235, 235, 245, .3);     /* tertiaryLabel */
+  --cpu: #0a84ff; --gpu: #30d158; --ram: #bf5af2; --net: #ff9f0a; --up: #64d2ff;  /* systemBlue/Green/Purple/Orange/Teal */
+  --ok: #30d158; --err: #ff453a;
+}
+body[data-theme]::before { display: none; }  /* no ambient gradient: flat black like iOS */
+.card { border: none; }
+.w * { text-transform: none !important; letter-spacing: normal !important; }
+.art-wrap { border-radius: clamp(8px, 5cqh, 14px); box-shadow: 0 4px 14px rgba(0, 0, 0, .5); }
+#dots i { background: rgba(255, 255, 255, .3) !important; }
+#dots i.on, #dots .dot.aim i { background: #fff !important; }
