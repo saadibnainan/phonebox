@@ -1952,3 +1952,4 @@ body[data-theme]::before { display: none; }  /* no ambient gradient: flat black 
 .art-wrap { border-radius: clamp(8px, 5cqh, 14px); box-shadow: 0 4px 14px rgba(0, 0, 0, .5); }
 #dots i { background: rgba(255, 255, 255, .3) !important; }
 #dots i.on, #dots .dot.aim i { background: #fff !important; }
+#dots .dot.on { background: transparent; box-shadow: none; }  /* upstream: status-light rule .dot.on also hits the page dots */
