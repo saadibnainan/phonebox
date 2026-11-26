@@ -1957,7 +1957,7 @@ body[data-theme]::before { display: none; }  /* no ambient gradient: flat black 
 /* --- local patch: StandBy widget (widgets/standby.js) --- */
 @font-face { font-family: "SB Rounded"; src: url("fonts/Nunito-Variable.ttf") format("truetype"); font-weight: 200 1000; font-display: block; }
 @font-face { font-family: "SB Tall"; src: url("fonts/Oswald-Variable.ttf") format("truetype"); font-weight: 200 700; font-display: block; }
-.w-standby { --sb-ease: cubic-bezier(.32, .72, 0, 1); }
+.sbx { --sb-ease: cubic-bezier(.32, .72, 0, 1); }
 .sbx { position: absolute; inset: 0; overflow: hidden; }
 .sbx-stage {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 5cqw;
