@@ -1930,3 +1930,7 @@ body.controls-top .ap-foot { order: -1; margin-bottom: 4px; }
 .ly-note[hidden] { display: none; }
 .w-lyrics:not(.timed):not(.plain) .ly-note { margin: auto; }
 .ly-credit { position: absolute; right: 10px; top: 9px; font-size: 9px; letter-spacing: .1em; color: var(--dim); }
+
+/* --- local patch (lavender-local): one-accent stats, square album art --- */
+:root { --cpu: #b794ff; --gpu: #b794ff; --ram: #b794ff; --net: #b794ff; --up: #d9c7ff; }
+.art-wrap { border-radius: 0; box-shadow: none; }
