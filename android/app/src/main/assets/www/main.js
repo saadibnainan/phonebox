@@ -7,6 +7,7 @@ import './appearance.js';
 import { cached } from './widgets/helpers.js';
 import './widgets/basic.js';
 import './widgets/stack.js';
+import './widgets/standby.js';
 import './widgets/time.js';
 import './widgets/pc.js';
 import './widgets/sky.js';
