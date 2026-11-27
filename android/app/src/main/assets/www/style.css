@@ -2065,7 +2065,7 @@ body[data-theme]::before { display: none; }  /* no ambient gradient: flat black 
 .sbx-media .vol { display: none; }
 
 /* face: playful (rounded, two overlapping tones) */
-.sbx[data-face="playful"] .sbx-clock { font-family: "SB Rounded", Inter, sans-serif; font-weight: 400; font-synthesis: none; font-size: min(100cqh, 46cqw); }
+.sbx[data-face="playful"] .sbx-clock { font-family: "SB Rounded", Inter, sans-serif; font-weight: 400; font-synthesis: none; font-size: min(92cqh, 42cqw); }
 /* Fredoka (wide) is the closest free match to SF Pro Rounded's StandBy digits: footless 1, wide round 0/3/5 */
 .sbx[data-face="playful"] .sbx-d { mix-blend-mode: screen; }
 
@@ -2225,3 +2225,14 @@ body[data-theme]::before { display: none; }  /* no ambient gradient: flat black 
 .sbx-media .m-controls .ic.play { width: 52px !important; height: 52px !important; }
 .sbx-media .vol .ic.sm { width: 44px !important; height: 44px !important; margin-left: -5px; }  /* 44 px touch target, icon optically on the 17 px edge */
 .sbx-media .vol { height: 44px; }
+
+/* --- local patch: date under the clock's bottom-right edge (not on Tall: its side column has the date) --- */
+.sbx-main { position: relative; }
+.sbx-date { position: absolute; right: 0; top: 100%; margin-top: .6cqh; white-space: nowrap;
+  font: 600 max(3.4cqh, 13px)/1.2 Inter, sans-serif; color: rgba(235, 235, 245, .7); letter-spacing: .01em; }
+.sbx[data-face="tall"] .sbx-date { display: none; }
+.sbx.sbx-editing .sbx-date { opacity: 0; transition: opacity .3s ease; }
+
+/* playful: the clock sits a little higher so the date line fits above the pill row */
+.sbx[data-face="playful"] .sbx-stage { bottom: 19cqh; }
+.sbx[data-face="vapor"] .sbx-date { right: var(--ink-r, 0px); }
