@@ -9,8 +9,10 @@
 // right; it leaves again after playback has been stopped for a short while.
 import { LOCALE, chime, clockPeriod, gotoPageRef, h, haptic, hour12, media, pad, quotaProviders, store, wxLines } from '../main.js';
 import { W } from '../registry.js';
+import { EXTRA_FACES } from './standby-faces.js';
 
-const FACES = ['playful', 'tall'];
+const FACES = ['playful', 'tall', 'flip', 'vapor', 'disk'];
+const FACE_NAME = { playful: 'Playful', tall: 'Tall', flip: 'Flip', vapor: 'Vapor', disk: 'Flip-disk' };
 // Colour choices per face (iOS system colours). playful: [main, overlap tone]; tall: [digits].
 const PALETTES = {
   playful: [
@@ -30,6 +32,36 @@ const PALETTES = {
     { id: 'yellow', name: 'Yellow', c: ['#ffd60a'] },
     { id: 'red', name: 'Red', c: ['#ff6961'] },
     { id: 'white', name: 'White', c: ['#f2f2f7'] },
+  ],
+  // flip: [digits]
+  flip: [
+    { id: 'white', name: 'White', c: ['#f2f2f7'] },
+    { id: 'amber', name: 'Amber', c: ['#ffd60a'] },
+    { id: 'blue', name: 'Blue', c: ['#64b5ff'] },
+    { id: 'coral', name: 'Coral', c: ['#f08f84'] },
+    { id: 'green', name: 'Green', c: ['#7fe39a'] },
+    { id: 'purple', name: 'Purple', c: ['#c99bff'] },
+    { id: 'red', name: 'Red', c: ['#ff6961'] },
+  ],
+  // vapor: [glow, core]
+  vapor: [
+    { id: 'cyan', name: 'Cyan', c: ['#64d2ff', '#e6f6ff'] },
+    { id: 'lavender', name: 'Lavender', c: ['#b794ff', '#efe6ff'] },
+    { id: 'coral', name: 'Coral', c: ['#ff8a7a', '#ffe9e5'] },
+    { id: 'green', name: 'Green', c: ['#30d158', '#e0ffe8'] },
+    { id: 'amber', name: 'Amber', c: ['#ffb340', '#fff3dd'] },
+    { id: 'pink', name: 'Pink', c: ['#ff6aa1', '#ffe6ef'] },
+    { id: 'white', name: 'White', c: ['#d1d1d6', '#ffffff'] },
+  ],
+  // disk: [disc colour]; lime is the original flip-disk-matrix colour
+  disk: [
+    { id: 'lime', name: 'Lime', c: ['#e5fd52'] },
+    { id: 'blue', name: 'Blue', c: ['#52a2ea'] },
+    { id: 'coral', name: 'Coral', c: ['#f08f84'] },
+    { id: 'green', name: 'Green', c: ['#30d158'] },
+    { id: 'amber', name: 'Amber', c: ['#ffd60a'] },
+    { id: 'white', name: 'White', c: ['#f2f2f7'] },
+    { id: 'purple', name: 'Purple', c: ['#bf5af2'] },
   ],
 };
 const BREAK = { std: ['#30d158', '#7fe39a'], alt: ['#64d2ff', '#9be4ff'] }; // breaks are green; teal when green is chosen
@@ -145,7 +177,10 @@ W.standby = {
     clock.append(digits[0], digits[1], colon, digits[2], digits[3], ap);
     const phaseEl = h('div', 'sbx-phase');
     const motiveEl = h('div', 'sbx-motive');
-    main.append(phaseEl, clock);
+    // the extra faces (flip, vapor, disk) render into this instead of the text clock
+    const alt = h('div', 'sbx-alt');
+    let altFace = null, lastStr = '    ';
+    main.append(phaseEl, clock, alt);
 
     const dayEl = h('b'), dateEl = h('span');
     const tempEl = h('div', 'sbx-temp');
@@ -194,8 +229,9 @@ W.standby = {
       root.style.setProperty('--sb-a', c[0]);
       root.style.setProperty('--sb-b', c[1] || c[0]);
       root.style.setProperty('--sb-tall', face === 'tall' ? (isBreak ? c[1] : c[0]) : c[1] || c[0]);
+      altFace?.color(c[0], face === 'vapor' ? (isBreak ? '#ffffff' : pal.c[1]) : c[1]);
       // one theme across every page: the StandBy colour is the app's accent (rings, charts, labels, shortcut icons)
-      const de = document.documentElement.style, acc = pal.c[1] || pal.c[0];
+      const de = document.documentElement.style, acc = face === 'playful' ? (pal.c[1] || pal.c[0]) : pal.c[0];
       globalThis.__sbxAccent = acc; // main.js uses it when it (re)applies the display settings
       de.setProperty('--accent', acc);
       de.setProperty('--theme-accent', acc);       // hex on purpose: charts append an alpha suffix to it
@@ -204,7 +240,7 @@ W.standby = {
     let editing = false, editTimer = 0;
     const renderEditor = () => {
       const pal = colorOf(face);
-      edName.textContent = `${face === 'playful' ? 'Playful' : 'Tall'} · ${pal.name}`;
+      edName.textContent = `${FACE_NAME[face]} · ${pal.name}`;
       swatches.replaceChildren(...PALETTES[face].map((x) => {
         const b = h('button', `sbx-sw${x.id === pal.id ? ' on' : ''}`);
         b.type = 'button';
@@ -233,11 +269,17 @@ W.standby = {
     doneBtn.addEventListener('click', (e) => { e.stopPropagation(); haptic(); exitEdit(); });
     editor.addEventListener('pointerdown', (e) => e.stopPropagation());
 
+    const mountAlt = (f) => {
+      try { altFace?.destroy(); } catch (_) {}
+      alt.replaceChildren();
+      altFace = EXTRA_FACES[f] ? EXTRA_FACES[f]() : null;
+      if (altFace) { alt.append(altFace.el); altFace.set(lastStr, false); }
+    };
     const setFace = (f, animate) => {
       face = f;
-      if (!animate) { root.dataset.face = f; applyColor(); if (editing) renderEditor(); return; }
+      if (!animate) { root.dataset.face = f; mountAlt(f); applyColor(); if (editing) renderEditor(); return; }
       root.classList.add('sbx-swap');
-      setTimeout(() => { root.dataset.face = f; applyColor(); if (editing) renderEditor(); root.classList.remove('sbx-swap'); }, 220);
+      setTimeout(() => { root.dataset.face = f; mountAlt(f); applyColor(); if (editing) renderEditor(); root.classList.remove('sbx-swap'); }, 220);
     };
     setFace(face, false);
 
@@ -315,6 +357,8 @@ W.standby = {
     const glyphs = digits.map(() => null);
     const reduceMotion = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
     const setDigits = (s, animate = true) => {
+      lastStr = s;
+      if (altFace) { try { altFace.set(s, animate); } catch (e) { console.warn('standby face', e); } }
       for (let i = 0; i < 4; i++) {
         const c = s[i] === ' ' ? '' : s[i];
         digits[i].hidden = c === '';
@@ -402,7 +446,7 @@ W.standby = {
         else if (kind === 'quotas') renderQuota();
         if (mediaNeeds.includes(kind)) { try { mediaInst.update?.(kind, background); } catch (e) { console.warn('standby media', e); } }
       },
-      destroy() { globalThis.__sbxFocusing = false; clearTimeout(holdTimer); clearTimeout(editTimer); try { mediaInst.destroy?.(); } catch (_) {} },
+      destroy() { try { altFace?.destroy(); } catch (_) {} globalThis.__sbxFocusing = false; clearTimeout(holdTimer); clearTimeout(editTimer); try { mediaInst.destroy?.(); } catch (_) {} },
     };
   },
 };
