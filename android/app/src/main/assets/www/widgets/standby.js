@@ -4,12 +4,36 @@
 // Focus: a pomodoro (25/5/15 × 4, trackMe's defaults and phase rules). Tap the Focus pill to start; while it runs the
 // big digits count down, a tap pauses/resumes and a long press stops it. Under the clock one line of motivation in
 // trackMe's wording and tone (options.tone: brutal | honest | encouraging), about blocks done today vs options.goal.
+// Colours: hold the clock for the editor (swipe ← → colour, ↑ ↓ face, or tap a swatch); options.color sets the default.
 // While something plays on the computer the clock glides left and a frosted media panel (30 % wide) slides in on the
 // right; it leaves again after playback has been stopped for a short while.
 import { LOCALE, chime, clockPeriod, gotoPageRef, h, haptic, hour12, media, pad, quotaProviders, store, wxLines } from '../main.js';
 import { W } from '../registry.js';
 
 const FACES = ['playful', 'tall'];
+// Colour choices per face (iOS system colours). playful: [main, overlap tone]; tall: [digits].
+const PALETTES = {
+  playful: [
+    { id: 'coral', name: 'Coral', c: ['#eb6a59', '#f08f84'] },
+    { id: 'blue', name: 'Blue', c: ['#0a84ff', '#64b5ff'] },
+    { id: 'green', name: 'Green', c: ['#30d158', '#7fe39a'] },
+    { id: 'purple', name: 'Purple', c: ['#bf5af2', '#d996ff'] },
+    { id: 'yellow', name: 'Yellow', c: ['#ffcc00', '#ffe066'] },
+    { id: 'pink', name: 'Pink', c: ['#ff375f', '#ff8aa1'] },
+    { id: 'white', name: 'White', c: ['#e5e5ea', '#aeaeb2'] },
+  ],
+  tall: [
+    { id: 'blue', name: 'Blue', c: ['#7aacf4'] },
+    { id: 'coral', name: 'Coral', c: ['#f08f84'] },
+    { id: 'green', name: 'Green', c: ['#7fe39a'] },
+    { id: 'purple', name: 'Purple', c: ['#c99bff'] },
+    { id: 'yellow', name: 'Yellow', c: ['#ffd60a'] },
+    { id: 'red', name: 'Red', c: ['#ff6961'] },
+    { id: 'white', name: 'White', c: ['#f2f2f7'] },
+  ],
+};
+const BREAK = { std: ['#30d158', '#7fe39a'], alt: ['#64d2ff', '#9be4ff'] }; // breaks are green; teal when green is chosen
+const EDIT_IDLE_MS = 8000;
 const MEDIA_LINGER_MS = 20000; // paused/stopped media keeps its place this long (track changes, short pauses)
 const MIN = 60_000;
 
@@ -90,6 +114,11 @@ W.standby = {
     const goal = Math.max(1, +o.goal || 4);
 
     // pomo: { index, phaseStart, pausedAt|null } while running; log: { day, today, lastEnd }
+    const colorKey = (f) => `standby-color:${id}:${f}`;
+    const colorOf = (f) => {
+      const want = store.get(colorKey(f), null) ?? (f === face ? o.color : null);
+      return PALETTES[f].find((x) => x.id === want) || PALETTES[f][0];
+    };
     let pomo = store.get(pomoKey, null);
     let log = store.get(logKey, { day: dayKey(), today: 0, lastEnd: 0 });
     const saveLog = () => store.set(logKey, log);
@@ -133,14 +162,63 @@ W.standby = {
     art?.addEventListener('error', syncGlass);
     const mediaNeeds = mediaInst.needs || W.media.needs;
 
-    root.append(stage, focusBtn, aiBtn, mediaBox);
+    // colour editor (hold the clock): frosted bar with the face name, swatches and Done
+    const edName = h('div', 'sbx-ed-name');
+    const edHint = h('div', 'sbx-ed-hint', 'Swipe ← → colour · ↑ ↓ style');
+    const swatches = h('div', 'sbx-swatches');
+    const doneBtn = h('button', 'sbx-ed-done', 'Done');
+    doneBtn.type = 'button';
+    const editor = h('div', 'sbx-editor', h('div', 'sbx-ed-text', edName, edHint), swatches, doneBtn);
+    editor.inert = true;
+
+    root.append(stage, focusBtn, aiBtn, mediaBox, editor);
     box.append(root);
+
+    let isBreak = false;
+    const applyColor = () => {
+      const pal = colorOf(face);
+      const c = isBreak ? (pal.id === 'green' ? BREAK.alt : BREAK.std) : pal.c;
+      root.style.setProperty('--sb-a', c[0]);
+      root.style.setProperty('--sb-b', c[1] || c[0]);
+      root.style.setProperty('--sb-tall', face === 'tall' ? (isBreak ? c[1] : c[0]) : c[1] || c[0]);
+    };
+    let editing = false, editTimer = 0;
+    const renderEditor = () => {
+      const pal = colorOf(face);
+      edName.textContent = `${face === 'playful' ? 'Playful' : 'Tall'} · ${pal.name}`;
+      swatches.replaceChildren(...PALETTES[face].map((x) => {
+        const b = h('button', `sbx-sw${x.id === pal.id ? ' on' : ''}`);
+        b.type = 'button';
+        b.setAttribute('aria-label', x.name);
+        b.style.background = x.c.length > 1 ? `linear-gradient(135deg, ${x.c[0]} 50%, ${x.c[1]} 50%)` : x.c[0];
+        b.addEventListener('click', (e) => { e.stopPropagation(); pickColor(x.id); });
+        return b;
+      }));
+    };
+    const bumpEdit = () => { clearTimeout(editTimer); editTimer = setTimeout(() => exitEdit(), EDIT_IDLE_MS); };
+    const pickColor = (cid) => { haptic(); store.set(colorKey(face), cid); applyColor(); renderEditor(); bumpEdit(); };
+    const stepColor = (dir) => {
+      const list = PALETTES[face], i = list.indexOf(colorOf(face));
+      pickColor(list[(i + dir + list.length) % list.length].id);
+    };
+    const enterEdit = () => {
+      if (editing) return;
+      editing = true; haptic(); renderEditor();
+      root.classList.add('sbx-editing'); editor.inert = false; bumpEdit();
+    };
+    function exitEdit() {
+      if (!editing) return;
+      editing = false; clearTimeout(editTimer);
+      root.classList.remove('sbx-editing'); editor.inert = true;
+    }
+    doneBtn.addEventListener('click', (e) => { e.stopPropagation(); haptic(); exitEdit(); });
+    editor.addEventListener('pointerdown', (e) => e.stopPropagation());
 
     const setFace = (f, animate) => {
       face = f;
-      if (!animate) { root.dataset.face = f; return; }
+      if (!animate) { root.dataset.face = f; applyColor(); if (editing) renderEditor(); return; }
       root.classList.add('sbx-swap');
-      setTimeout(() => { root.dataset.face = f; root.classList.remove('sbx-swap'); }, 220);
+      setTimeout(() => { root.dataset.face = f; applyColor(); if (editing) renderEditor(); root.classList.remove('sbx-swap'); }, 220);
     };
     setFace(face, false);
 
@@ -174,21 +252,32 @@ W.standby = {
     };
     focusBtn.addEventListener('click', () => (pomo ? stop() : start()));
 
-    // gestures on the clock: vertical swipe = face, tap = pause/resume a running pomodoro, long press = stop it
+    // gestures on the clock:
+    //   hold = colour editor;  vertical swipe = face;  tap = pause/resume a running pomodoro
+    //   in the editor: horizontal swipe = colour, vertical swipe = face, tap = done
     let y0 = null, x0 = 0, t0 = 0, holdTimer = 0, held = false;
     stage.addEventListener('pointerdown', (e) => {
       y0 = e.clientY; x0 = e.clientX; t0 = Date.now(); held = false;
       clearTimeout(holdTimer);
-      if (pomo) holdTimer = setTimeout(() => { held = true; stop(); }, 700);
+      if (!editing) holdTimer = setTimeout(() => { held = true; enterEdit(); }, 550);
+    });
+    stage.addEventListener('pointermove', (e) => {
+      if (y0 != null && Math.hypot(e.clientX - x0, e.clientY - y0) > 12) clearTimeout(holdTimer);
     });
     stage.addEventListener('pointerup', (e) => {
       clearTimeout(holdTimer);
       if (y0 == null || held) { y0 = null; return; }
       const dy = e.clientY - y0, dx = e.clientX - x0; y0 = null;
-      if (Math.abs(dy) >= 50 && Math.abs(dy) >= Math.abs(dx) * 1.5) {
+      const vertical = Math.abs(dy) >= 40 && Math.abs(dy) >= Math.abs(dx) * 1.3;
+      const horizontal = Math.abs(dx) >= 40 && Math.abs(dx) >= Math.abs(dy) * 1.3;
+      const tap = Math.abs(dx) < 12 && Math.abs(dy) < 12 && Date.now() - t0 < 500;
+      if (vertical) {
         const next = FACES[(FACES.indexOf(face) + (dy < 0 ? 1 : FACES.length - 1)) % FACES.length];
         haptic(); store.set(faceKey, next); setFace(next, true);
-      } else if (pomo && Math.abs(dx) < 12 && Math.abs(dy) < 12 && Date.now() - t0 < 500) togglePause();
+        if (editing) bumpEdit();
+      } else if (editing && horizontal) stepColor(dx < 0 ? 1 : -1);
+      else if (editing && tap) { haptic(); exitEdit(); }
+      else if (!editing && pomo && tap) togglePause();
     });
     stage.addEventListener('pointercancel', () => { y0 = null; clearTimeout(holdTimer); });
 
@@ -215,13 +304,14 @@ W.standby = {
       const p = phaseNow();
       root.classList.toggle('pomo', !!p);
       root.classList.toggle('pomo-break', !!p && p.kind !== 'work');
+      if (isBreak !== (!!p && p.kind !== 'work')) { isBreak = !isBreak; applyColor(); }
       root.classList.toggle('pomo-paused', !!pomo?.pausedAt);
       if (p) {
         const secs = Math.ceil(p.left / 1000);
         const mm = Math.floor(secs / 60), ss = secs % 60;
         setDigits((mm < 10 ? ' ' : '') + String(Math.min(mm, 99)) + pad(ss));
         ap.textContent = '';
-        phaseEl.textContent = pomo.pausedAt ? 'Paused · tap to resume, hold to stop'
+        phaseEl.textContent = pomo.pausedAt ? 'Paused · tap to resume'
           : `${PHASE_LABEL[p.kind]}${p.kind === 'work' ? ` · ${p.block}/${conf.cycles}` : ''}`;
         focusBtn.textContent = '■ Stop';
       } else {
@@ -276,7 +366,7 @@ W.standby = {
         else if (kind === 'quotas') renderQuota();
         if (mediaNeeds.includes(kind)) { try { mediaInst.update?.(kind, background); } catch (e) { console.warn('standby media', e); } }
       },
-      destroy() { globalThis.__sbxFocusing = false; clearTimeout(holdTimer); try { mediaInst.destroy?.(); } catch (_) {} },
+      destroy() { globalThis.__sbxFocusing = false; clearTimeout(holdTimer); clearTimeout(editTimer); try { mediaInst.destroy?.(); } catch (_) {} },
     };
   },
 };
