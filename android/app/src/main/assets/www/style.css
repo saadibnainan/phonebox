@@ -1959,7 +1959,7 @@ body[data-theme]::before { display: none; }  /* no ambient gradient: flat black 
 @font-face { font-family: "SB Tall"; src: url("fonts/Oswald-Variable.ttf") format("truetype"); font-weight: 200 700; font-display: block; }
 .sbx { --sb-ease: cubic-bezier(.32, .72, 0, 1); --sb-a: #eb6a59; --sb-b: #f08f84; --sb-tall: #7aacf4; position: absolute; inset: 0; overflow: hidden; }
 .sbx-stage {
-  position: absolute; inset: 0 0 13cqh 0; display: flex; align-items: center; justify-content: center; gap: 5cqw;
+  position: absolute; inset: 0 0 16cqh 0; display: flex; align-items: center; justify-content: center; gap: 5cqw;
   transform-origin: 0 50%; transition: transform .9s var(--sb-ease);
 }
 /* media takes the right 30 %: the clock shrinks into the left 70 % (centre at 35 %) */
