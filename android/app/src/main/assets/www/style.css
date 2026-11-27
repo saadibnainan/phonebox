@@ -2109,3 +2109,24 @@ body[data-theme]::before { display: none; }  /* no ambient gradient: flat black 
 .sbx-media .art-wrap { max-height: 38cqh; max-width: 38cqh; flex: 0 1 auto; min-height: 0; }
 .sbx-media .m-title { font-size: clamp(14px, 5.6cqh, 19px); line-height: 1.25; }
 .sbx-media .m-artist { margin-top: 2px; }
+
+/* --- local patch: one theme on every page (matches StandBy) ---
+   surfaces = StandBy's frosted glass (no glows, sheens or per-item tints), one accent = the StandBy colour
+   (widgets/standby.js sets --accent / --accent-2), severity colours (ok / warn / error) keep their meaning */
+:root, body[data-theme] {
+  --card: rgba(255, 255, 255, .07);
+  --card-hi: rgba(255, 255, 255, .11);
+  --line: rgba(255, 255, 255, .12);
+  --cpu: var(--theme-accent, #52a2ea); --gpu: var(--theme-accent, #52a2ea); --ram: var(--theme-accent, #52a2ea); --net: var(--theme-accent, #52a2ea);
+  --up: var(--theme-accent-2, #0a62c0);
+}
+.card { border: 1px solid var(--line); background: var(--card); background-image: none; box-shadow: none; }
+/* AI quotas: no brand glow; rings and logos in the accent */
+.q-card { --q: var(--theme-accent, #52a2ea) !important; background: var(--card) !important; border-radius: 20px; }
+/* shortcuts: plain glass keys, accent icons (was one tint per key) */
+.key { --k: var(--theme-accent, #52a2ea) !important; background: var(--card) !important; border: 1px solid var(--line) !important; border-radius: 20px; }
+.key .k-icon { color: var(--theme-accent, #52a2ea); }
+.key:active { filter: none; background: var(--card-hi) !important; }
+/* sessions: flat status dots, no glow */
+.sess .st, .sess.busy .st, .sess.shell .st { box-shadow: none; }
+.key.toggle.on::before { box-shadow: none; }

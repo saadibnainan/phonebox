@@ -2767,7 +2767,7 @@ export function applyDisplay() {
   I18n?.applyDom();
   // theme and accent apply in the preview and the browser too
   document.body.dataset.theme = ['amoled', 'midnight', 'warm', 'graphite'].includes(d.theme) ? d.theme : 'default';
-  const accent = hexToRgb(d.accent);
+  const accent = hexToRgb(globalThis.__sbxAccent || d.accent); // local patch: the StandBy colour is the app accent
   const before = DEFAULT_AMBIENT;
   DEFAULT_AMBIENT = accent || '45, 212, 191';
   document.documentElement.style.setProperty('--accent', `rgb(${DEFAULT_AMBIENT})`);

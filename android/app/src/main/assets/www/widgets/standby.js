@@ -194,6 +194,12 @@ W.standby = {
       root.style.setProperty('--sb-a', c[0]);
       root.style.setProperty('--sb-b', c[1] || c[0]);
       root.style.setProperty('--sb-tall', face === 'tall' ? (isBreak ? c[1] : c[0]) : c[1] || c[0]);
+      // one theme across every page: the StandBy colour is the app's accent (rings, charts, labels, shortcut icons)
+      const de = document.documentElement.style, acc = pal.c[1] || pal.c[0];
+      globalThis.__sbxAccent = acc; // main.js uses it when it (re)applies the display settings
+      de.setProperty('--accent', acc);
+      de.setProperty('--theme-accent', acc);       // hex on purpose: charts append an alpha suffix to it
+      de.setProperty('--theme-accent-2', pal.c[0]);
     };
     let editing = false, editTimer = 0;
     const renderEditor = () => {
