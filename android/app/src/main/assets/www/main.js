@@ -16,6 +16,7 @@ import './widgets/photos.js';
 import './widgets/controls.js';
 import './widgets/console.js';
 import './widgets/dictate.js';
+import './widgets/keyboard.js';
 import './widgets/camera.js';
 import './widgets/spectrum.js';
 import './widgets/steam-library.js';

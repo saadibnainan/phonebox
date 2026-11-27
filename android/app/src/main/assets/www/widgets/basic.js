@@ -273,6 +273,9 @@ W.media = {
           return;
         }
         box.classList.toggle('playing', m.playing);
+        // local patch: a player that reports no length (Firefox/YouTube over MPRIS gives no position either) gets no
+        // progress bar instead of one frozen at 0:00 / 0:00
+        box.classList.toggle('no-length', !(m.durMs > 0) && m.app !== 'Internet Radio');
         q('.m-app-name').textContent = m.app || tp('Media');
         sourceIcon.innerHTML = sourceIcons[m.app] || '';
         q('.m-title').textContent = m.title || tp('Unknown track');
