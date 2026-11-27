@@ -1955,7 +1955,7 @@ body[data-theme]::before { display: none; }  /* no ambient gradient: flat black 
 #dots .dot.on { background: transparent; box-shadow: none; }  /* upstream: status-light rule .dot.on also hits the page dots */
 
 /* --- local patch: StandBy widget (widgets/standby.js) --- */
-@font-face { font-family: "SB Rounded"; src: url("fonts/Nunito-Variable.ttf") format("truetype"); font-weight: 200 1000; font-display: block; }
+@font-face { font-family: "SB Rounded"; src: url("fonts/Fredoka-Variable.ttf") format("truetype"); font-weight: 300 700; font-stretch: 75% 125%; font-display: block; }
 @font-face { font-family: "SB Tall"; src: url("fonts/Oswald-Variable.ttf") format("truetype"); font-weight: 200 700; font-display: block; }
 .sbx { --sb-ease: cubic-bezier(.32, .72, 0, 1); --sb-a: #eb6a59; --sb-b: #f08f84; --sb-tall: #7aacf4; position: absolute; inset: 0; overflow: hidden; }
 .sbx-stage {
@@ -1996,7 +1996,12 @@ body[data-theme]::before { display: none; }  /* no ambient gradient: flat black 
 .sbx.sbx-swap .sbx-main, .sbx.sbx-swap .sbx-side { opacity: 0; filter: blur(8px); transform: translateY(-3%); }
 .sbx-clock { display: flex; align-items: center; line-height: .82; font-variant-numeric: tabular-nums; white-space: nowrap; transition: opacity .4s ease; }
 .sbx.pomo-paused .sbx-clock { opacity: .55; }
-.sbx-d { transition: color .8s ease; }
+.sbx-d { transition: color .8s ease; display: inline-grid; }
+/* numeric-text roll (widgets/standby.js setDigits): old and new glyph share the slot's one grid cell */
+.sbx-g { grid-area: 1 / 1; display: block; transition: transform .6s cubic-bezier(.34, 1.36, .64, 1), filter .45s ease, opacity .4s ease; }
+.sbx-g.sbx-in { transform: translateY(42%) scale(.92); filter: blur(12px); opacity: 0; transition: none; }
+.sbx-g.sbx-out { transform: translateY(-42%) scale(.92); filter: blur(12px); opacity: 0;
+  transition: transform .45s cubic-bezier(.4, 0, 1, 1), filter .4s ease, opacity .35s ease; }
 .sbx-d[hidden] { display: none; }
 .sbx-colon { display: inline-flex; flex-direction: column; justify-content: center; position: relative; z-index: 2; }
 .sbx-colon i { display: block; border-radius: 50%; transition: background .8s ease; }
@@ -2026,7 +2031,7 @@ body[data-theme]::before { display: none; }  /* no ambient gradient: flat black 
 .sbx { --sb-edge: 7.7cqw; }  /* = the playful clock's edges (its digit slots) */
 .sbx[data-face="tall"] { --sb-edge: 14cqw; }
 /* tall: condensed like the reference (digits stretched, the round colon is not) */
-.sbx[data-face="tall"] .sbx-d { display: inline-block; transform: scaleY(1.28); }
+.sbx[data-face="tall"] .sbx-d { transform: scaleY(1.28); }
 .sbx-focus { left: var(--sb-edge); transition: background .2s ease, left .9s var(--sb-ease), opacity .3s ease; }
 .sbx-ai { right: var(--sb-edge); gap: 1em; }
 /* with media the row follows the clock, which is scaled .7 from the left edge */
@@ -2059,9 +2064,11 @@ body[data-theme]::before { display: none; }  /* no ambient gradient: flat black 
 .sbx-media .vol { display: none; }
 
 /* face: playful (rounded, two overlapping tones) */
-.sbx[data-face="playful"] .sbx-clock { font-family: "SB Rounded", Inter, sans-serif; font-weight: 1000; font-size: min(94cqh, 43cqw); }
-/* Nunito's digits are narrower than SF Pro Rounded's: widen them (rounder, like the reference) and overlap more */
-.sbx[data-face="playful"] .sbx-d { mix-blend-mode: screen; display: inline-block; transform: scaleX(1.07); }
+.sbx[data-face="playful"] .sbx-clock { font-family: "SB Rounded", Inter, sans-serif; font-weight: 700; font-stretch: 107%; font-size: min(100cqh, 46cqw); }
+/* Fredoka (wide) is the closest free match to SF Pro Rounded's StandBy digits: footless 1, wide round 0/3/5 */
+.sbx[data-face="playful"] .sbx-d { mix-blend-mode: screen; }
+/* Fredoka tops out at Bold; a same-colour stroke brings it to SF Pro Rounded Heavy's stroke weight */
+.sbx[data-face="playful"] .sbx-g { -webkit-text-stroke: .028em currentColor; paint-order: stroke fill; }
 .sbx[data-face="playful"] .sbx-d + .sbx-d { margin-left: -.12em; }
 .sbx[data-face="playful"] .sbx-colon + .sbx-d { margin-left: -.07em; }
 .sbx[data-face="playful"] .sbx-d0, .sbx[data-face="playful"] .sbx-d2 { color: var(--sb-a); }
@@ -2082,7 +2089,7 @@ body[data-theme]::before { display: none; }  /* no ambient gradient: flat black 
 .sbx-blocks { display: flex; align-items: center; gap: .35em; }
 .sbx-b-ic { color: var(--sb-tall); font-size: .8em; }
 
-@media (prefers-reduced-motion: reduce) { .sbx-stage, .sbx-media, .sbx-main, .sbx-side, .sbx-d { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .sbx-stage, .sbx-media, .sbx-main, .sbx-side, .sbx-d, .sbx-g { transition: none !important; } }
 /* the row under the clock (flex, so nothing in it can overlap): edges follow the clock, also when it shrinks for media */
 .sbx-row {
   position: absolute; left: var(--sb-edge); right: var(--sb-edge); bottom: 4cqh; z-index: 3;
