@@ -15,7 +15,7 @@ const FACES = ['playful', 'tall'];
 const PALETTES = {
   playful: [
     { id: 'coral', name: 'Coral', c: ['#eb6a59', '#f08f84'] },
-    { id: 'blue', name: 'Blue', c: ['#0a84ff', '#64b5ff'] },
+    { id: 'blue', name: 'Blue', c: ['#0a62c0', '#52a2ea'] },
     { id: 'green', name: 'Green', c: ['#30d158', '#7fe39a'] },
     { id: 'purple', name: 'Purple', c: ['#bf5af2', '#d996ff'] },
     { id: 'yellow', name: 'Yellow', c: ['#ffcc00', '#ffe066'] },
@@ -50,26 +50,30 @@ function durWords(ms) {
   return `${Math.floor(hrs / 24)} days`;
 }
 
-// trackMe lib/accountability/reality.ts, scoped to what the panel knows: blocks done here and today's goal
+// trackMe lib/accountability/reality.ts + pushes.ts, scoped to what the panel knows: blocks done here and today's
+// goal. Copy is about what was done, never about the person. Several lines per state; the line changes every 5 min.
 function motive(tone, s) {
-  const pick = (m) => m[tone] || m.brutal;
-  if (s.running && s.kind === 'work') return pick({
-    brutal: 'Timer running. Finish the block before you touch your phone.',
-    honest: 'Timer running.',
-    encouraging: "You're studying. Keep going.",
-  });
+  const slot = Math.floor(Date.now() / 300_000);
+  const pick = (m) => { const v = m[tone] || m.brutal; return Array.isArray(v) ? v[slot % v.length] : v; };
+  const left = s.goal - s.today;
+  const b = (n) => `${n} ${n === 1 ? 'block' : 'blocks'}`;
   if (s.paused) return pick({
-    brutal: 'Paused. The block is still waiting.',
+    brutal: ['Paused. The block is still waiting.', 'Paused. Your goal is not.', 'Paused. Finish what you started.'],
     honest: 'Timer paused.',
     encouraging: 'Paused. Pick it back up when you are ready.',
   });
+  if (s.running && s.kind === 'work') return pick({
+    brutal: ['Timer running. Finish the block before you touch your phone.', 'Block in progress. Phone down.', 'Stay on it. The block is not done.'],
+    honest: 'Timer running.',
+    encouraging: "You're studying. Keep going.",
+  });
   if (s.running) return pick({
-    brutal: 'Break. Stand up, then get back to it.',
+    brutal: ['Break. Stand up, then get back to it.', 'Break, not the end of the day.', `Break. ${b(Math.max(left, 0))} still open today.`],
     honest: 'Break.',
     encouraging: 'Break. You earned it.',
   });
   if (!s.lastEnd) return pick({
-    brutal: 'Not a single minute logged yet.',
+    brutal: ['Not a single minute logged yet.', 'Zero blocks so far. Start the first one.'],
     honest: 'No study time logged yet.',
     encouraging: 'Your first session starts here.',
   });
@@ -77,22 +81,29 @@ function motive(tone, s) {
   if (s.today === 0 && idleMs >= 20 * 3_600_000) {
     const idle = durWords(idleMs);
     return pick({
-      brutal: `${idle} without studying.`,
+      brutal: [`${idle} without studying.`, `Last block: ${idle} ago.`, `${idle} without studying. One block ends that.`],
       honest: `Last study session: ${idle} ago.`,
       encouraging: `It's been ${idle}. A short session today restarts the habit.`,
     });
   }
-  const left = s.goal - s.today;
-  if (left > 0) {
-    const b = `${left} ${left === 1 ? 'block' : 'blocks'}`;
-    return pick({
-      brutal: `${b} short of your own goal today.`,
-      honest: `${s.today} of ${s.goal} blocks today.`,
-      encouraging: `${b} to go today. One at a time.`,
-    });
-  }
+  // the evening check (trackMe pushes.ts): late, nothing or too little done
+  const late = new Date().getHours() >= 21;
+  if (late && left > 0) return pick({
+    brutal: s.today === 0
+      ? ['Not one minute today. One 25 min block before bed.', 'Nothing studied today. One block before bed.']
+      : [`${b(s.today)} today. ${b(left)} short. One more block before bed.`, `Your plan needed ${b(s.goal)} today. ${b(left)} short.`],
+    honest: `${s.today} of ${s.goal} blocks today. One block still fits in tonight.`,
+    encouraging: `Still time today. ${b(left)} to go, one short block helps.`,
+  });
+  if (left > 0) return pick({
+    brutal: s.today === 0
+      ? ['Nothing studied today.', `Zero blocks today. Your goal is ${s.goal}.`, `${b(s.goal)} planned. ${b(s.goal)} still open.`]
+      : [`${b(left)} short of your own goal today.`, `${s.today} of ${s.goal} blocks. The rest will not do themselves.`, `${b(left)} left. Start the next one now.`],
+    honest: `${s.today} of ${s.goal} blocks today.`,
+    encouraging: `${b(left)} to go today. One at a time.`,
+  });
   return pick({
-    brutal: "Goal done. Don't get comfortable.",
+    brutal: ["Goal done. Don't get comfortable.", `${b(s.today)} today. One more puts you ahead.`, 'Goal met. Tomorrow counts too.'],
     honest: `Goal done: ${s.today} blocks today.`,
     encouraging: `Goal done: ${s.today} blocks today. Well played.`,
   });
@@ -134,7 +145,7 @@ W.standby = {
     clock.append(digits[0], digits[1], colon, digits[2], digits[3], ap);
     const phaseEl = h('div', 'sbx-phase');
     const motiveEl = h('div', 'sbx-motive');
-    main.append(phaseEl, clock, motiveEl);
+    main.append(phaseEl, clock);
 
     const dayEl = h('b'), dateEl = h('span');
     const tempEl = h('div', 'sbx-temp');
@@ -171,7 +182,9 @@ W.standby = {
     const editor = h('div', 'sbx-editor', h('div', 'sbx-ed-text', edName, edHint), swatches, doneBtn);
     editor.inert = true;
 
-    root.append(stage, focusBtn, aiBtn, mediaBox, editor);
+    // the row under the clock, spanning the clock's width: Focus | motive | AI usage
+    const row = h('div', 'sbx-row', focusBtn, motiveEl, aiBtn);
+    root.append(stage, row, mediaBox, editor);
     box.append(root);
 
     let isBreak = false;
