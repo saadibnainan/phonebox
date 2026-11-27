@@ -304,11 +304,28 @@ W.standby = {
     };
 
     // ------------------------------------------------ render
-    const setDigits = (s) => {
+    // iOS numeric-text transition: a changed digit rolls — the old glyph rises, blurs and fades, the new one comes up
+    // from below with a little spring. Only digits that change move; the first paint and reduced motion don't animate.
+    const glyphs = digits.map(() => null);
+    const reduceMotion = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
+    const setDigits = (s, animate = true) => {
       for (let i = 0; i < 4; i++) {
         const c = s[i] === ' ' ? '' : s[i];
-        if (digits[i].textContent !== c) digits[i].textContent = c;
         digits[i].hidden = c === '';
+        const cur = glyphs[i];
+        if (cur && cur.textContent === c) continue;
+        const g = h('b', 'sbx-g', c);
+        if (cur && animate && c !== '' && !reduceMotion() && !document.hidden) {
+          cur.classList.add('sbx-out');
+          g.classList.add('sbx-in');
+          digits[i].append(g);
+          const old = cur;
+          setTimeout(() => old.remove(), 700);
+          requestAnimationFrame(() => requestAnimationFrame(() => g.classList.remove('sbx-in')));
+        } else {
+          digits[i].replaceChildren(g);
+        }
+        glyphs[i] = g;
       }
     };
     const render = () => {
