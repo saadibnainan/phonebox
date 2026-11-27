@@ -71,6 +71,8 @@ function vaporFace() {
     slots = [];
     for (let i = 0; i < 4; i++) { slots.push({ x: x + dw / 2, w: dw }); x += dw + (i === 1 ? cw : 0); }
     slots.colon = { x: slots[1].x + dw / 2 + cw / 2 };
+    // where the digits really end, so the date line under the clock can line up with them
+    (el.closest('.sbx-main') || el).style.setProperty('--ink-r', `${Math.max(0, (W - total) / 2)}px`);
     slots.y = H / 2 + size * 0.36;
     slots.size = size;
   }

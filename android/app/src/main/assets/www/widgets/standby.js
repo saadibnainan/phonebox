@@ -180,7 +180,9 @@ W.standby = {
     // the extra faces (flip, vapor, disk) render into this instead of the text clock
     const alt = h('div', 'sbx-alt');
     let altFace = null, lastStr = '    ';
-    main.append(phaseEl, clock, alt);
+    // the date, small, under the clock's bottom-right edge (where Apple's StandBy puts its one line)
+    const dateLine = h('div', 'sbx-date');
+    main.append(phaseEl, clock, alt, dateLine);
 
     const dayEl = h('b'), dateEl = h('span');
     const tempEl = h('div', 'sbx-temp');
@@ -409,6 +411,8 @@ W.standby = {
       if (motiveEl.textContent !== m) motiveEl.textContent = m;
       dayEl.textContent = now.toLocaleDateString(LOCALE, { weekday: 'short' }).replace('.', '').toUpperCase();
       dateEl.textContent = ' ' + now.getDate();
+      const dl = now.toLocaleDateString(LOCALE, { weekday: 'short', day: 'numeric', month: 'short' });
+      if (dateLine.textContent !== dl) dateLine.textContent = dl;
     };
     const renderWeather = () => { const l = wxLines(); tempEl.textContent = l ? l.temp : ''; };
     const ring = (pct, color) => {
