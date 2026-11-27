@@ -2058,13 +2058,14 @@ body[data-theme]::before { display: none; }  /* no ambient gradient: flat black 
 .sbx-media .vol { display: none; }
 
 /* face: playful (rounded, two overlapping tones) */
-.sbx[data-face="playful"] .sbx-clock { font-family: "SB Rounded", Inter, sans-serif; font-weight: 1000; font-size: min(100cqh, 47cqw); }
+.sbx[data-face="playful"] .sbx-clock { font-family: "SB Rounded", Inter, sans-serif; font-weight: 1000; font-size: min(94cqh, 43cqw); }
 /* Nunito's digits are narrower than SF Pro Rounded's: widen them (rounder, like the reference) and overlap more */
 .sbx[data-face="playful"] .sbx-d { mix-blend-mode: screen; display: inline-block; transform: scaleX(1.07); }
-.sbx[data-face="playful"] .sbx-d + .sbx-d, .sbx[data-face="playful"] .sbx-colon + .sbx-d { margin-left: -.17em; }
+.sbx[data-face="playful"] .sbx-d + .sbx-d { margin-left: -.12em; }
+.sbx[data-face="playful"] .sbx-colon + .sbx-d { margin-left: -.07em; }
 .sbx[data-face="playful"] .sbx-d0, .sbx[data-face="playful"] .sbx-d2 { color: var(--sb-a); }
 .sbx[data-face="playful"] .sbx-d1, .sbx[data-face="playful"] .sbx-d3 { color: var(--sb-b); }
-.sbx[data-face="playful"] .sbx-colon { gap: .24em; margin-left: -.16em; width: .18em; }
+.sbx[data-face="playful"] .sbx-colon { gap: .24em; margin-left: -.07em; width: .18em; }
 .sbx[data-face="playful"] .sbx-colon i { width: .18em; height: .18em; background: radial-gradient(circle at 30% 35%, #eef1f6, #c4c6cc 70%); mix-blend-mode: screen; }
 .sbx[data-face="playful"] .sbx-ap { color: var(--sb-b); }
 .sbx[data-face="playful"] .sbx-side { display: none; }
