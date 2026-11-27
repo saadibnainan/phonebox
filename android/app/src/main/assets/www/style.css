@@ -2094,3 +2094,8 @@ body[data-theme]::before { display: none; }  /* no ambient gradient: flat black 
 }
 .sbx.with-media .sbx-ai-reset { display: none; }  /* narrow row next to media: ring + % only */
 .sbx.with-media .sbx-row > .sbx-motive { -webkit-line-clamp: 3; }  /* narrow row next to media */
+/* media panel: art + text take what is left above the controls and never push into them (long two-line titles) */
+.sbx-media .m-top { flex: 1 1 auto; min-height: 0; overflow: hidden; gap: 8px; }
+.sbx-media .art-wrap { max-height: 38cqh; max-width: 38cqh; flex: 0 1 auto; min-height: 0; }
+.sbx-media .m-title { font-size: clamp(14px, 5.6cqh, 19px); line-height: 1.25; }
+.sbx-media .m-artist { margin-top: 2px; }
