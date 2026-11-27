@@ -2148,3 +2148,80 @@ body[data-theme]::before { display: none; }  /* no ambient gradient: flat black 
   font: 600 clamp(12px, 4cqh, 17px)/1 Inter, sans-serif; touch-action: none; cursor: pointer; transition: background .12s ease, transform .12s ease; }
 .kbx-key.down { background: var(--card-hi); transform: scale(.95); color: var(--theme-accent, #52a2ea); }
 .w-media.no-length .m-progress { display: none; }  /* local patch: no length known → no frozen 0:00 bar */
+
+/* --- local patch: StandBy extra faces (widgets/standby-faces.js) --- */
+.sbx-alt { display: none; }
+.sbx[data-face="flip"] .sbx-clock, .sbx[data-face="vapor"] .sbx-clock, .sbx[data-face="disk"] .sbx-clock { display: none; }
+.sbx[data-face="flip"] .sbx-alt, .sbx[data-face="vapor"] .sbx-alt, .sbx[data-face="disk"] .sbx-alt { display: block; }
+.sbx[data-face="flip"] .sbx-side, .sbx[data-face="vapor"] .sbx-side, .sbx[data-face="disk"] .sbx-side { display: none; }
+.sbx[data-face="flip"], .sbx[data-face="vapor"], .sbx[data-face="disk"] { --sb-edge: 7cqw; }
+.sbx[data-face="flip"] .sbx-phase, .sbx[data-face="vapor"] .sbx-phase, .sbx[data-face="disk"] .sbx-phase { color: var(--sb-a); }
+
+/* flip: split-flap cards (dark glass cards, digits in the palette colour) */
+.sbf { --fh: min(64cqh, 30cqw); display: flex; align-items: center; gap: calc(var(--fh) * .07);
+  font: 700 calc(var(--fh) * .8)/1 Inter, sans-serif; font-variant-numeric: tabular-nums; color: var(--sb-a); }
+.sbf-card { position: relative; width: calc(var(--fh) * .7); height: var(--fh); perspective: calc(var(--fh) * 4);
+  border-radius: calc(var(--fh) * .1); box-shadow: 0 12px 30px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .06); }
+.sbf-card[hidden] { display: none; }
+.sbf-half { position: absolute; left: 0; right: 0; height: 50%; overflow: hidden; color: var(--sb-a); transition: color .8s ease; }
+.sbf-top { top: 0; border-radius: calc(var(--fh) * .1) calc(var(--fh) * .1) 0 0; background: linear-gradient(#252528, #1d1d20); }
+.sbf-bot { bottom: 0; border-radius: 0 0 calc(var(--fh) * .1) calc(var(--fh) * .1); background: linear-gradient(#1b1b1e, #161618); }
+.sbf-half span { position: absolute; left: 0; right: 0; height: var(--fh); line-height: var(--fh); text-align: center; }
+.sbf-top span { top: 0; }
+.sbf-bot span { bottom: 0; }
+.sbf-card::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px; background: #000; z-index: 3; }
+.sbf-flap-top { z-index: 2; transform-origin: 50% 100%; backface-visibility: hidden; animation: sbf-fold-top .3s cubic-bezier(.55, 0, .9, .45) forwards; }
+.sbf-flap-bot { z-index: 2; transform-origin: 50% 0; backface-visibility: hidden; transform: rotateX(90deg);
+  animation: sbf-fold-bot .32s cubic-bezier(.2, 1.4, .55, 1) .28s forwards; }
+@keyframes sbf-fold-top { to { transform: rotateX(-90deg); filter: brightness(.6); } }
+@keyframes sbf-fold-bot { from { transform: rotateX(90deg); filter: brightness(1.4); } to { transform: rotateX(0); filter: none; } }
+.sbf-colon { display: flex; flex-direction: column; gap: calc(var(--fh) * .24); padding: 0 calc(var(--fh) * .02); }
+.sbf-colon i { display: block; width: calc(var(--fh) * .085); height: calc(var(--fh) * .085); border-radius: 50%; background: var(--sb-a); opacity: .85; }
+
+/* vapor: canvas with glowing digits; particles drift up when a digit changes */
+.sbv { width: 86cqw; height: 64cqh; }
+.sbv-cv { width: 100%; height: 100%; display: block; }
+
+/* disk: flip-disk matrix (31×11) in a dark bezel, discs flip with a ripple */
+.sbk { width: min(84cqw, 170cqh); padding: 1.2cqw; border-radius: 24px; background: #0f0f0f;
+  border: 1px solid rgba(255, 255, 255, .08); box-shadow: inset 0 4px 20px rgba(0, 0, 0, .8), 0 20px 40px rgba(0, 0, 0, .5); }
+.sbk-screen { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: .32cqw; padding: .9cqw;
+  border-radius: 14px; background: #000; box-shadow: inset 0 2px 10px #000; }
+.sbk-d { aspect-ratio: 1; perspective: 400px; }
+.sbk-in { position: relative; width: 100%; height: 100%; transform-style: preserve-3d;
+  transition: transform .6s cubic-bezier(.34, 1.56, .64, 1) var(--dly, 0ms); }
+.sbk-d.on .sbk-in { transform: rotateX(180deg); }
+.sbk-instant .sbk-in { transition: none; }
+.sbk-off, .sbk-on { position: absolute; inset: 0; border-radius: 50%; backface-visibility: hidden; }
+.sbk-off { background: #171717; border: 1px solid #262626; box-shadow: inset 0 2px 4px rgba(0, 0, 0, .6); }
+.sbk-on { background: var(--sb-a); border: 1px solid color-mix(in srgb, var(--sb-a) 78%, #000); transform: rotateX(180deg);
+  box-shadow: inset 0 -2px 6px rgba(0, 0, 0, .2); transition: background .8s ease; }
+
+@media (prefers-reduced-motion: reduce) { .sbk-in { transition: none !important; } .sbf-flap-top, .sbf-flap-bot { animation: none !important; display: none; } }
+
+/* media panel: the volume row is back (mute toggle + slider) on its own line under the controls */
+.sbx-media .m-controls { flex-wrap: wrap; row-gap: 8px; justify-content: center; }
+.sbx-media .vol { display: flex !important; flex: 1 0 100%; order: 9; margin: 2px 0 0; }
+.sbx-media .vol .volr { flex: 1; min-width: 0; }
+/* media panel alignment pass: square art, text on the same 16 px edges as the bars, even vertical rhythm */
+.sbx-media { padding: 16px !important; justify-content: flex-start !important; gap: 0 !important; }
+.sbx-media .m-top { gap: 10px; margin-bottom: 12px; padding: 0 !important; width: 100%; }
+.sbx-media .art-wrap { flex: none !important; width: min(42cqh, 100%) !important; height: auto !important;
+  aspect-ratio: 1; max-width: none !important; max-height: none !important; }
+.sbx-media .m-text { width: 100%; margin: 0 !important; padding: 0 !important; gap: 2px; }
+.sbx-media .m-progress { margin: 0 0 8px; }
+.sbx-media .m-controls { margin: 0; row-gap: 10px; }
+.sbx-media .vol { margin: 0 !important; }
+.sbx-media { height: 92cqh !important; }
+.sbx-media .m-top { flex: none !important; overflow: visible !important; gap: 8px; margin-bottom: 10px; }
+.sbx-media .art-wrap { width: min(32cqh, 100%) !important; }
+.sbx-media .m-progress { margin: 0 0 6px; }
+.sbx-media .m-controls { row-gap: 8px; }
+.sbx-media { height: auto !important; max-height: 92cqh; }  /* fit the content: equal top and bottom padding */
+.sbx-media { container-type: inline-size !important; }  /* size containment would stop height:auto from fitting the content */
+/* the panel's own sizes (its container queries would otherwise measure the whole StandBy area) */
+.sbx-media .art-wrap { width: min(116px, 100%) !important; }
+.sbx-media .m-controls .ic { width: 44px !important; height: 44px !important; }
+.sbx-media .m-controls .ic.play { width: 52px !important; height: 52px !important; }
+.sbx-media .vol .ic.sm { width: 44px !important; height: 44px !important; margin-left: -5px; }  /* 44 px touch target, icon optically on the 17 px edge */
+.sbx-media .vol { height: 44px; }
