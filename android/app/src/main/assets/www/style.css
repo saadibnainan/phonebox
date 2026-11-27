@@ -2022,7 +2022,7 @@ body[data-theme]::before { display: none; }  /* no ambient gradient: flat black 
   font: 600 clamp(14px, 3.6cqh, 20px)/1 Inter, sans-serif; color: #fff; cursor: pointer;
   transition: background .2s ease, transform .9s var(--sb-ease);
 }
-.sbx { --sb-edge: 10.3cqw; }  /* = the playful digits' visible edge */
+.sbx { --sb-edge: 7.7cqw; }  /* = the playful clock's edges (its digit slots) */
 .sbx[data-face="tall"] { --sb-edge: 14cqw; }
 /* tall: condensed like the reference (digits stretched, the round colon is not) */
 .sbx[data-face="tall"] .sbx-d { display: inline-block; transform: scaleY(1.28); }
