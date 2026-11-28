@@ -65,14 +65,15 @@ const PALETTES = {
   ],
 };
 const BREAK = { std: ['#30d158', '#7fe39a'], alt: ['#64d2ff', '#9be4ff'] }; // breaks are green; teal when green is chosen
-// Night (iOS StandBy's night mode): in a dark room or inside options.nightStart–nightEnd the StandBy page alone goes deep
-// red on black. No brightness change and no wake timeout; the accent of the other pages stays the day colour.
+// Night (iOS StandBy's night mode): only in a dark room (the phone's light sensor: under 3 lux for 30 s, back above
+// 15 lux) the StandBy page alone goes deep red on black; in a lit room it keeps its normal colours whatever the time.
+// No brightness change and no wake timeout; the accent of the other pages stays the day colour. options.night:false = off.
 const NIGHT = { std: ['#b3261e', '#6e1712'], vapor: ['#8a1c14', '#d0352a'], brk: ['#1f7a3a', '#145227'] };
 // Burn-in drift: every 2 minutes the whole StandBy page steps along a small loop (up to 1.2 % of its size), so the colon,
 // the pills, the tag and the date don't sit on the same OLED pixels all day. It jumps (one repaint), it doesn't glide.
 const DRIFT = [[0, 0], [0.6, -0.8], [1.2, 0], [0.6, 0.8], [0, 1.2], [-0.6, 0.8], [-1.2, 0], [-0.6, -0.8], [0, -1.2], [0.6, -0.4]];
 const DRIFT_MS = 120_000;
-const hm = (v, d) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(v ?? '')) || /^(\d{1,2}):(\d{2})$/.exec(d); return (+m[1] % 24) * 60 + Math.min(59, +m[2]); };
+
 const EDIT_IDLE_MS = 8000;
 const MEDIA_LINGER_MS = 20000; // paused/stopped media keeps its place this long (track changes, short pauses)
 const MIN = 60_000;
@@ -264,13 +265,7 @@ W.standby = {
     box.append(root);
 
     let isBreak = false, isNight = false;
-    const nightFrom = hm(o.nightStart, '00:30'), nightTo = hm(o.nightEnd, '07:30');
-    const nightNow = (now = new Date()) => {
-      if (o.night === false) return false;
-      if (darkRoom) return true;
-      const m = now.getHours() * 60 + now.getMinutes();
-      return nightFrom <= nightTo ? m >= nightFrom && m < nightTo : m >= nightFrom || m < nightTo;
-    };
+    const nightNow = () => o.night !== false && darkRoom;
     const applyColor = () => {
       const pal = colorOf(face);
       const red = isNight && !editing; // the colour editor shows the real colours, also at night
@@ -452,7 +447,7 @@ W.standby = {
       const p = phaseNow();
       root.classList.toggle('pomo', !!p);
       root.classList.toggle('pomo-break', !!p && p.kind !== 'work');
-      const night = nightNow(now);
+      const night = nightNow();
       if (isBreak !== (!!p && p.kind !== 'work') || isNight !== night) { isBreak = !!p && p.kind !== 'work'; isNight = night; applyColor(); }
       root.classList.toggle('pomo-paused', !!pomo?.pausedAt);
       if (p) {
