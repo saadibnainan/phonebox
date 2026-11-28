@@ -1,7 +1,7 @@
 // Keyboard (local patch): a remote keyboard for the PC, riding on the Dictation widget (options.keyboard = true),
 // because the agent keeps only widget types from its catalog and checks typing permission on a dictate widget.
 //   text box  → typed on the PC with the dictation endpoint ("Type", or "Type ↵" to press Enter after it)
-//   key grid  → the agent's builtin:keys shortcuts kb-* (Esc, Tab, ⌫, Del, arrows, Home/End, Space, ↵, Ctrl+C/V/X/Z/A/S)
+//   key grid  → the agent's builtin:keys shortcuts kb-* (Esc, Tab, ⌫, Del, arrows, Home/End, Space, ↵, Ctrl+C/V/X/Z/A/S, ⌘Q = Alt+Q)
 // ⌫, Del and the arrows repeat while held. Needs the dictation widget's "Type the text on the computer" (control) on.
 import { API, PANEL_HEADERS, api, h, haptic, toast } from '../main.js';
 import { W } from '../registry.js';
@@ -11,7 +11,7 @@ const KEYS = [
   ['kb-home', 'Home'], ['kb-up', '↑', true], ['kb-end', 'End'], ['kb-enter', '↵'],
   ['kb-left', '←', true], ['kb-down', '↓', true], ['kb-right', '→', true], ['kb-space', 'Space'],
   ['kb-ctrl-c', 'Ctrl C'], ['kb-ctrl-v', 'Ctrl V'], ['kb-ctrl-x', 'Ctrl X'], ['kb-ctrl-z', 'Ctrl Z'],
-  ['kb-ctrl-a', 'Ctrl A'], ['kb-ctrl-s', 'Ctrl S'],
+  ['kb-ctrl-a', 'Ctrl A'], ['kb-ctrl-s', 'Ctrl S'], ['kb-cmd-q', '⌘ Q'], // ⌘ = Alt here: Alt+Q closes the window (hypr/user.lua)
 ];
 const MAX_CHARS = 2000;
 
