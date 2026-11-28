@@ -7,7 +7,7 @@
 // Colours: hold the clock for the editor (swipe ← → colour, ↑ ↓ face, or tap a swatch); options.color sets the default.
 // While something plays on the computer the clock glides left and a frosted media panel (30 % wide) slides in on the
 // right; it leaves again after playback has been stopped for a short while.
-import { D, LOCALE, chime, clockPeriod, gotoPageRef, h, haptic, hour12, media, pad, quotaProviders, store, wxLines } from '../main.js';
+import { D, LOCALE, chime, darkRoom, clockPeriod, gotoPageRef, h, haptic, hour12, media, pad, quotaProviders, store, wxLines } from '../main.js';
 import { W } from '../registry.js';
 import { EXTRA_FACES } from './standby-faces.js';
 
@@ -65,6 +65,10 @@ const PALETTES = {
   ],
 };
 const BREAK = { std: ['#30d158', '#7fe39a'], alt: ['#64d2ff', '#9be4ff'] }; // breaks are green; teal when green is chosen
+// Night (iOS StandBy's night mode): in a dark room or inside options.nightStart–nightEnd the StandBy page alone goes deep
+// red on black. No brightness change and no wake timeout; the accent of the other pages stays the day colour.
+const NIGHT = { std: ['#b3261e', '#6e1712'], vapor: ['#8a1c14', '#d0352a'], brk: ['#1f7a3a', '#145227'] };
+const hm = (v, d) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(v ?? '')) || /^(\d{1,2}):(\d{2})$/.exec(d); return (+m[1] % 24) * 60 + Math.min(59, +m[2]); };
 const EDIT_IDLE_MS = 8000;
 const MEDIA_LINGER_MS = 20000; // paused/stopped media keeps its place this long (track changes, short pauses)
 const MIN = 60_000;
@@ -255,14 +259,24 @@ W.standby = {
     root.append(stage, row, mediaBox, editor, tag);
     box.append(root);
 
-    let isBreak = false;
+    let isBreak = false, isNight = false;
+    const nightFrom = hm(o.nightStart, '00:30'), nightTo = hm(o.nightEnd, '07:30');
+    const nightNow = (now = new Date()) => {
+      if (o.night === false) return false;
+      if (darkRoom) return true;
+      const m = now.getHours() * 60 + now.getMinutes();
+      return nightFrom <= nightTo ? m >= nightFrom && m < nightTo : m >= nightFrom || m < nightTo;
+    };
     const applyColor = () => {
       const pal = colorOf(face);
-      const c = isBreak ? (pal.id === 'green' ? BREAK.alt : BREAK.std) : pal.c;
+      const red = isNight && !editing; // the colour editor shows the real colours, also at night
+      const c = red ? (isBreak ? NIGHT.brk : face === 'vapor' ? NIGHT.vapor : NIGHT.std)
+        : isBreak ? (pal.id === 'green' ? BREAK.alt : BREAK.std) : pal.c;
+      root.classList.toggle('sbx-night', red);
       root.style.setProperty('--sb-a', c[0]);
       root.style.setProperty('--sb-b', c[1] || c[0]);
       root.style.setProperty('--sb-tall', face === 'tall' ? (isBreak ? c[1] : c[0]) : c[1] || c[0]);
-      altFace?.color(c[0], face === 'vapor' ? (isBreak ? '#ffffff' : pal.c[1]) : c[1]);
+      altFace?.color(c[0], face === 'vapor' ? (red ? c[1] : isBreak ? '#ffffff' : pal.c[1]) : c[1]);
       // one theme across every page: the StandBy colour is the app's accent (rings, charts, labels, shortcut icons)
       const de = document.documentElement.style, acc = face === 'playful' ? (pal.c[1] || pal.c[0]) : pal.c[0];
       globalThis.__sbxAccent = acc; // main.js uses it when it (re)applies the display settings
@@ -291,12 +305,12 @@ W.standby = {
     };
     const enterEdit = () => {
       if (editing) return;
-      editing = true; haptic(); renderEditor();
+      editing = true; haptic(); renderEditor(); if (isNight) applyColor();
       root.classList.add('sbx-editing'); editor.inert = false; bumpEdit();
     };
     function exitEdit() {
       if (!editing) return;
-      editing = false; clearTimeout(editTimer);
+      editing = false; clearTimeout(editTimer); if (isNight) applyColor();
       root.classList.remove('sbx-editing'); editor.inert = true;
     }
     doneBtn.addEventListener('click', (e) => { e.stopPropagation(); haptic(); exitEdit(); });
@@ -425,7 +439,8 @@ W.standby = {
       const p = phaseNow();
       root.classList.toggle('pomo', !!p);
       root.classList.toggle('pomo-break', !!p && p.kind !== 'work');
-      if (isBreak !== (!!p && p.kind !== 'work')) { isBreak = !isBreak; applyColor(); }
+      const night = nightNow(now);
+      if (isBreak !== (!!p && p.kind !== 'work') || isNight !== night) { isBreak = !!p && p.kind !== 'work'; isNight = night; applyColor(); }
       root.classList.toggle('pomo-paused', !!pomo?.pausedAt);
       if (p) {
         const secs = Math.ceil(p.left / 1000);
