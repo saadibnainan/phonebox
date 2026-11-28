@@ -221,7 +221,8 @@ W.standby = {
 
     // the row under the clock, spanning the clock's width: Focus | motive | AI usage
     const row = h('div', 'sbx-row', focusBtn, motiveEl, aiBtn);
-    root.append(stage, row, mediaBox, editor);
+    const tag = h('div', 'sbx-tag'); tag.textContent = '#INAN';  // local patch: name tag, top-left corner
+    root.append(stage, row, mediaBox, editor, tag);
     box.append(root);
 
     let isBreak = false;
@@ -407,8 +408,7 @@ W.standby = {
       // a running session keeps the panel out of the night screen until it ends or is paused
       globalThis.__sbxFocusing = !!p && !pomo.pausedAt;
       blocksEl.replaceChildren(h('span', 'sbx-b-ic', '◉'), h('span', '', `${log.today}/${goal}`));
-      const m = motive(tone, { paused: !!pomo?.pausedAt, running: !!p && !pomo.pausedAt, kind: p?.kind, lastEnd: log.lastEnd, today: log.today, goal });
-      if (motiveEl.textContent !== m) motiveEl.textContent = m;
+      // local patch: no motive line any more; the row keeps an empty spacer between Focus and AI
       dayEl.textContent = now.toLocaleDateString(LOCALE, { weekday: 'short' }).replace('.', '').toUpperCase();
       dateEl.textContent = ' ' + now.getDate();
       const dl = now.toLocaleDateString(LOCALE, { weekday: 'short', day: 'numeric', month: 'short' });

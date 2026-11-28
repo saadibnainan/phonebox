@@ -2258,3 +2258,10 @@ html body :is(.clock, .sbx-clock, .sbf, .t-val b, .g-val, .s-main b, .q-pct, .q-
 .sbx[data-face="playful"] .sbx-colon { color: var(--sb-a); }
 .sbx[data-face="tall"] .sbx-d { transform: none; }
 .sbx[data-face="tall"] .sbx-clock { font-size: min(64cqh, 22cqw); }
+/* StandBy: #INAN tag top-left (aligned with the Focus pill's left edge), replaces the motive line */
+.sbx .sbx-row > .sbx-motive { visibility: hidden; }
+.sbx-tag { position: absolute; top: 6cqh; left: var(--sb-edge); z-index: 3; pointer-events: none;
+  font-family: var(--nf-dot) !important; font-size: max(7cqh, 22px); line-height: 1; letter-spacing: .06em !important; color: rgba(255, 255, 255, .9);
+  transition: left .9s var(--sb-ease), opacity .3s ease; }
+.sbx.with-media .sbx-tag { left: calc(var(--sb-edge) * .7); }
+.sbx.sbx-editing .sbx-tag { opacity: 0; }
