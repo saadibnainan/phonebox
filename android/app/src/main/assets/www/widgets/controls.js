@@ -1122,6 +1122,10 @@ W.trackpad = {
       moved = true;
       send({ type });
       feel(type.startsWith('swipe') ? 'swipe' : type);
+      // local patch: on Linux a sideways swipe (3 or 4 fingers) steps through the desktops, like a Mac's (hidden shortcuts
+      // ws-next / ws-prev); fingers moving left go to the next desktop
+      const ws = D.state?.os !== 'macos' && /^swipe[34](left|right)$/.exec(type);
+      if (ws) { api('/run/' + (ws[1] === 'left' ? 'ws-next' : 'ws-prev'), 'POST').catch(() => {}); if (strength) buzz('0,20,45,20'); }
     }
 
     pad.addEventListener('pointerdown', (e) => {
