@@ -1117,7 +1117,8 @@ W.trackpad = {
       let type = null;
       if (final && g.n >= 4 && together && way === 'out' && dist < 45 && ratio > 1.35) type = 'spread';
       else if (final && g.n >= 4 && together && way === 'in' && dist < 45 && ratio < 0.72) type = 'pinch';
-      else if (dist > (final ? 32 : 60)) type = 'swipe' + Math.min(g.n, 4)  // local patch: a quick flick that lifts early counts from 32 px + (Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down'));
+      // local patch: a quick flick that lifts early counts as a swipe from 32 px (60 while the fingers still move)
+      else if (dist > (final ? 32 : 60)) type = 'swipe' + Math.min(g.n, 4) + (Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down'));
       if (!type) return;
       gestureFired = true;
       clearTimeout(gestureQuietTimer);
