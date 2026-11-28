@@ -2300,7 +2300,7 @@ body:has(.sbx.sbx-night) #dots { opacity: .25; }
 html[data-font="nothing"] { --pf-text: "NType", Inter, sans-serif; --pf-clock: "Ndot", "NType", Inter, sans-serif; --pf-tag: "Ndot", Inter, sans-serif; }
 html[data-font="rounded"] { --pf-text: "PB Nunito", Inter, sans-serif; --pf-clock: "PB Nunito", Inter, sans-serif; --pf-tag: "PB Nunito", Inter, sans-serif; }
 html[data-font="android"] { --pf-text: sans-serif; --pf-clock: sans-serif; --pf-tag: sans-serif; }
-html:not([data-font="nothing"]) body, html:not([data-font="nothing"]) body *:not(svg):not(svg *):not(.sbx-clock):not(.sbx-clock *) {
+html:not([data-font="nothing"]) body, html:not([data-font="nothing"]) body *:not(svg):not(svg *):not(.sbx-clock):not(.sbx-clock *):not(.sbx-tag) {
   font-family: var(--pf-text) !important; }
 html[data-font="iphone"] body { font-feature-settings: "cv11", "ss03", "tnum"; }
 html:not([data-font="nothing"]) body :is(.clock, .t-val b, .g-val, .s-main b, .q-pct, .q-ov-val, .wc-t, .cd-v, .pv, .ct-n, .sw-t, .wx-temp, .br-c) {
@@ -2311,3 +2311,5 @@ html:not([data-font="nothing"]) body :is(.clock, .t-val b, .g-val, .s-main b, .q
 .sbx-ed-text { overflow: hidden; flex: 1 1 auto; }
 .sbx-ed-name, .sbx-ed-hint { overflow: hidden; text-overflow: ellipsis; }
 .sbx-swatches, .sbx-ed-font, .sbx-ed-done { flex: none; }
+/* the StandBy name tag is always in the pixel (dot-matrix) font, whatever the font picker says */
+html body .sbx .sbx-tag { font-family: "Ndot", Inter, sans-serif !important; font-weight: 400; letter-spacing: .04em !important; }
