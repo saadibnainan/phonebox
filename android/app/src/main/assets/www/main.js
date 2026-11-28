@@ -828,7 +828,7 @@ export function keyButton(s, { cover = false, label = true } = {}) {
   // the icon theme has, none of them a picture the user chose for the button. The agent says which is which, since the
   // picture's size cannot tell (an SVG reports a default size, often 24 px from an icon set). The same goes for the
   // icon size: only an upload is sized by it, a program's own icon keeps its size.
-  if (s.iconRev != null) applyShortcutIcon(b, icon, s.id, cover && s.iconUpload === true, s.iconUpload === true);
+  if (s.iconRev != null) applyShortcutIcon(b, icon, s.id, cover && s.iconUpload === true, s.iconUpload === true, s.iconRev);
   return b;
 }
 
@@ -864,15 +864,15 @@ export function setKeyFace(b, s, cover = false) {
   b.querySelector('.k-label').textContent = s.label;
   // a key that had no visible name is named by its id; the name follows the face
   if (b.hasAttribute('aria-label')) b.setAttribute('aria-label', String(s.label || '').trim() || s.id);
-  if (s.iconRev != null) applyShortcutIcon(b, icon, s.id, cover && s.iconUpload === true, s.iconUpload === true);
+  if (s.iconRev != null) applyShortcutIcon(b, icon, s.id, cover && s.iconUpload === true, s.iconUpload === true, s.iconRev);
 }
 
 /** `cover`: ask for the upload only and fill the key with it. `upload`: the picture the agent serves is an upload, so the
  *  key's icon size applies to it (k-icon-up); a program's own icon is not resized. */
-function applyShortcutIcon(b, icon, id, cover, upload) {
+function applyShortcutIcon(b, icon, id, cover, upload, rev) {
   // a picture that arrives after the key changed face (a cycle key) is not the face any more: it is dropped
   const current = () => (b.dataset.face || b.dataset.id) === id;
-  const url = `${API}/shortcuts/icon?id=${encodeURIComponent(id)}`;
+  const url = `${API}/shortcuts/icon?id=${encodeURIComponent(id)}${rev != null ? `&rev=${encodeURIComponent(rev)}` : ''}`; // local patch: rev busts the cached picture when the icon changes
   const img = new Image();
   if (cover) {
     // the upload only: if it was removed since the config was read, the key falls back to the centred icon (the
@@ -884,7 +884,7 @@ function applyShortcutIcon(b, icon, id, cover, upload) {
       b.prepend(img, h('span', 'k-shade'));
       b.classList.add('k-cover');
     };
-    img.onerror = () => applyShortcutIcon(b, icon, id, false, false); // the upload is gone: what is served now is not one
+    img.onerror = () => applyShortcutIcon(b, icon, id, false, false, rev); // the upload is gone: what is served now is not one
     img.src = url + '&upload=true'; // "true", not "1": the agent binds it as a bool and answers 400 to "1"
     return;
   }
