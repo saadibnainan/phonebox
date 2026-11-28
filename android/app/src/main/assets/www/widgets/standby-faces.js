@@ -62,7 +62,7 @@ function vaporFace() {
     W = Math.max(1, r.width); H = Math.max(1, r.height);
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     const size = Math.min(H * 0.92, W / 2.7);
-    font = `200 ${size}px Inter, sans-serif`;
+    font = `400 ${size}px Ndot, Inter, sans-serif`;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.font = font;
     const dw = g.measureText('0').width, cw = size * 0.32;
@@ -146,6 +146,7 @@ function vaporFace() {
   const kick = () => { if (!raf && !dead) raf = requestAnimationFrame(frame); };
 
   const ro = new ResizeObserver(() => { layout(); kick(); });
+  if (document.fonts) document.fonts.load("400 40px Ndot").then(() => { if (!dead) { layout(); kick(); } }, () => {});
   ro.observe(el);
 
   function set(s, animate) {
