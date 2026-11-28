@@ -75,6 +75,17 @@ const DRIFT = [[0, 0], [0.6, -0.8], [1.2, 0], [0.6, 0.8], [0, 1.2], [-0.6, 0.8],
 const DRIFT_MS = 120_000;
 
 const EDIT_IDLE_MS = 8000;
+// Font picker (the whole app): stored on the phone, applied as html[data-font] (style.css "font picker"). The default is
+// the iPhone look (Inter, the free stand-in for SF Pro); the picker sits in the StandBy editor ("Aa").
+const FONTS = [['iphone', 'iPhone'], ['nothing', 'Nothing'], ['rounded', 'Rounded'], ['android', 'Android']];
+// localStorage directly, not main.js's store: this module runs before main.js has finished initialising (it imports us)
+const fontNow = () => { let f = 'iphone'; try { f = JSON.parse(localStorage.getItem('pb-font')) || f; } catch (_) {} return FONTS.some(([id]) => id === f) ? f : 'iphone'; };
+const saveFont = (f) => { try { localStorage.setItem('pb-font', JSON.stringify(f)); } catch (_) {} };
+export function applyFont(id = fontNow()) {
+  document.documentElement.dataset.font = id;
+  try { window.dispatchEvent(new CustomEvent('pb-font', { detail: id })); } catch (_) {}
+}
+applyFont();
 const MEDIA_LINGER_MS = 20000; // paused/stopped media keeps its place this long (track changes, short pauses)
 const MIN = 60_000;
 const MAX_RUN_MS = 12 * 3_600_000; // a focus run ends after 12 h, like trackMe's (lib/timer/elapsed.ts)
@@ -255,7 +266,10 @@ W.standby = {
     const swatches = h('div', 'sbx-swatches');
     const doneBtn = h('button', 'sbx-ed-done', 'Done');
     doneBtn.type = 'button';
-    const editor = h('div', 'sbx-editor', h('div', 'sbx-ed-text', edName, edHint), swatches, doneBtn);
+    const fontBtn = h('button', 'sbx-ed-font');
+    fontBtn.type = 'button';
+    fontBtn.setAttribute('aria-label', 'Font');
+    const editor = h('div', 'sbx-editor', h('div', 'sbx-ed-text', edName, edHint), swatches, fontBtn, doneBtn);
     editor.inert = true;
 
     // the row under the clock, spanning the clock's width: Focus | motive | AI usage
@@ -287,6 +301,7 @@ W.standby = {
     const renderEditor = () => {
       const pal = colorOf(face);
       edName.textContent = `${FACE_NAME[face]} · ${pal.name}`;
+      fontBtn.textContent = `Aa ${(FONTS.find(([id]) => id === fontNow()) || FONTS[0])[1]}`;
       swatches.replaceChildren(...PALETTES[face].map((x) => {
         const b = h('button', `sbx-sw${x.id === pal.id ? ' on' : ''}`);
         b.type = 'button';
@@ -313,6 +328,12 @@ W.standby = {
       root.classList.remove('sbx-editing'); editor.inert = true;
     }
     doneBtn.addEventListener('click', (e) => { e.stopPropagation(); haptic(); exitEdit(); });
+    fontBtn.addEventListener('click', (e) => {
+      e.stopPropagation(); haptic();
+      const i = FONTS.findIndex(([id]) => id === fontNow());
+      const next = FONTS[(i + 1) % FONTS.length][0];
+      saveFont(next); applyFont(next); renderEditor(); bumpEdit();
+    });
     editor.addEventListener('pointerdown', (e) => e.stopPropagation());
 
     const mountAlt = (f) => {
