@@ -1037,7 +1037,10 @@ W.trackpad = {
       const sy = Math.round(accScrollY);
       accScrollX -= sx;
       accScrollY -= sy;
-      if (sx !== 0 || sy !== 0) { send({ type: 'scroll', dx: sx, dy: sy, delta: sy }); scrollFeel(sx, sy); }
+      // local patch: on Linux the PC's pb-pointerd plays a wheel "notch" as 1/8 of one (high-resolution, smooth), so the
+      // scroll goes over 8x finer and the page moves a few pixels at a time, like a Mac's trackpad, instead of in notches
+      const fine = D.state?.os === 'linux' ? 8 : 1;
+      if (sx !== 0 || sy !== 0) { send({ type: 'scroll', dx: sx * fine, dy: sy * fine, delta: sy * fine }); scrollFeel(sx, sy); }
     }
     // a light tick for each notch of a wheel (120), at most one every 45 ms so a fast scroll hums instead of buzzing
     let scrollSince = 0, lastScrollTick = 0;
