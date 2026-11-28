@@ -68,6 +68,10 @@ const BREAK = { std: ['#30d158', '#7fe39a'], alt: ['#64d2ff', '#9be4ff'] }; // b
 // Night (iOS StandBy's night mode): in a dark room or inside options.nightStart–nightEnd the StandBy page alone goes deep
 // red on black. No brightness change and no wake timeout; the accent of the other pages stays the day colour.
 const NIGHT = { std: ['#b3261e', '#6e1712'], vapor: ['#8a1c14', '#d0352a'], brk: ['#1f7a3a', '#145227'] };
+// Burn-in drift: every 2 minutes the whole StandBy page steps along a small loop (up to 1.2 % of its size), so the colon,
+// the pills, the tag and the date don't sit on the same OLED pixels all day. It jumps (one repaint), it doesn't glide.
+const DRIFT = [[0, 0], [0.6, -0.8], [1.2, 0], [0.6, 0.8], [0, 1.2], [-0.6, 0.8], [-1.2, 0], [-0.6, -0.8], [0, -1.2], [0.6, -0.4]];
+const DRIFT_MS = 120_000;
 const hm = (v, d) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(v ?? '')) || /^(\d{1,2}):(\d{2})$/.exec(d); return (+m[1] % 24) * 60 + Math.min(59, +m[2]); };
 const EDIT_IDLE_MS = 8000;
 const MEDIA_LINGER_MS = 20000; // paused/stopped media keeps its place this long (track changes, short pauses)
@@ -432,8 +436,17 @@ W.standby = {
         glyphs[i] = g;
       }
     };
-    let lastMinute = -1;
+    let lastMinute = -1, driftStep = -1;
+    const drift = () => {
+      if (o.drift === false || editing) return; // the editor holds the page still
+      const step = Math.floor(Date.now() / DRIFT_MS) % DRIFT.length;
+      if (step === driftStep) return;
+      driftStep = step;
+      root.style.setProperty('--sbx-dx', `${DRIFT[step][0]}%`);
+      root.style.setProperty('--sbx-dy', `${DRIFT[step][1]}%`);
+    };
     const render = () => {
+      drift();
       advance(); rollDay();
       const now = new Date();
       const p = phaseNow();

@@ -2287,3 +2287,6 @@ html body :is(.clock, .sbx-clock, .sbf, .t-val b, .g-val, .s-main b, .q-pct, .q-
   filter: grayscale(1) brightness(.55) sepia(1) hue-rotate(-50deg) saturate(9); }
 .sbx.sbx-night .sbf { filter: brightness(.6); }
 body:has(.sbx.sbx-night) #dots { opacity: .25; }
+
+/* ---- local patch: StandBy burn-in drift (standby.js steps --sbx-dx/--sbx-dy every 2 min) ---- */
+.sbx { transform: translate(var(--sbx-dx, 0), var(--sbx-dy, 0)); }
