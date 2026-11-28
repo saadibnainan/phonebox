@@ -2238,30 +2238,30 @@ body[data-theme]::before { display: none; }  /* no ambient gradient: flat black 
 .sbx[data-face="playful"] .sbx-stage { bottom: 19cqh; }
 .sbx[data-face="vapor"] .sbx-date { right: var(--ink-r, 0px); }
 
-/* --- local patch: Nothing typeface everywhere (NType 82 for text, Ndot 57 dot-matrix for clocks and big numbers).
+/* --- local patch: Nothing typeface everywhere (only when the font picker is on "Nothing": html[data-font="nothing"]) (NType 82 for text, Ndot 57 dot-matrix for clocks and big numbers).
    The font files are Nothing's own and are kept out of git (.git/info/exclude); a build without them falls back to Inter. --- */
 @font-face { font-family: "NType"; src: url("fonts/NType82-Regular.otf") format("opentype"); font-weight: 100 599; font-display: block; }
 @font-face { font-family: "NType"; src: url("fonts/NType82-Headline.otf") format("opentype"); font-weight: 600 900; font-display: block; }
 @font-face { font-family: "Ndot"; src: url("fonts/Ndot57-Regular.otf") format("opentype"); font-display: block; }
 :root { --nf-text: "NType", Inter, sans-serif; --nf-dot: "Ndot", "NType", Inter, sans-serif; }
-html body, html body *:not(svg):not(svg *) { font-family: var(--nf-text) !important; font-feature-settings: normal; font-synthesis: none; }
-html body :is(.clock, .sbx-clock, .sbf, .t-val b, .g-val, .s-main b, .q-pct, .q-ov-val, .wc-t, .cd-v, .pv, .ct-n, .sw-t, .wx-temp, .br-c),
-html body :is(.clock, .sbx-clock, .sbf, .t-val b, .g-val, .s-main b, .q-pct, .q-ov-val, .wc-t, .cd-v, .pv, .ct-n, .sw-t, .wx-temp, .br-c) * {
+html[data-font="nothing"] body, html[data-font="nothing"] body *:not(svg):not(svg *) { font-family: var(--nf-text) !important; font-feature-settings: normal; font-synthesis: none; }
+html[data-font="nothing"] body :is(.clock, .sbx-clock, .sbf, .t-val b, .g-val, .s-main b, .q-pct, .q-ov-val, .wc-t, .cd-v, .pv, .ct-n, .sw-t, .wx-temp, .br-c),
+html[data-font="nothing"] body :is(.clock, .sbx-clock, .sbf, .t-val b, .g-val, .s-main b, .q-pct, .q-ov-val, .wc-t, .cd-v, .pv, .ct-n, .sw-t, .wx-temp, .br-c) * {
   font-family: var(--nf-dot) !important; font-weight: 400 !important; letter-spacing: .02em !important; }
 /* StandBy digits in Ndot: fixed-width slots (Ndot has no tabular figures), no overlap, dot-sized colon */
-.sbx-clock .sbx-d { width: .6em; justify-items: center; }
-.sbx[data-face="playful"] .sbx-clock { font-size: min(70cqh, 30cqw); line-height: .74; }
-.sbx[data-face="playful"] .sbx-d + .sbx-d, .sbx[data-face="playful"] .sbx-colon + .sbx-d { margin-left: 0; }
-.sbx[data-face="playful"] .sbx-d { mix-blend-mode: normal; }
-.sbx[data-face="playful"] .sbx-colon, .sbx[data-face="tall"] .sbx-colon { gap: .2em; margin: 0 .06em; width: auto; }
-.sbx[data-face="playful"] .sbx-colon i, .sbx[data-face="tall"] .sbx-colon i { width: .085em; height: .085em; background: currentColor; }
-.sbx[data-face="playful"] .sbx-colon { color: var(--sb-a); }
-.sbx[data-face="tall"] .sbx-d { transform: none; }
-.sbx[data-face="tall"] .sbx-clock { font-size: min(64cqh, 22cqw); }
+html[data-font="nothing"] .sbx-clock .sbx-d { width: .6em; justify-items: center; }
+html[data-font="nothing"] .sbx[data-face="playful"] .sbx-clock { font-size: min(70cqh, 30cqw); line-height: .74; }
+html[data-font="nothing"] .sbx[data-face="playful"] .sbx-d + .sbx-d, html[data-font="nothing"] .sbx[data-face="playful"] .sbx-colon + .sbx-d { margin-left: 0; }
+html[data-font="nothing"] .sbx[data-face="playful"] .sbx-d { mix-blend-mode: normal; }
+html[data-font="nothing"] .sbx[data-face="playful"] .sbx-colon, html[data-font="nothing"] .sbx[data-face="tall"] .sbx-colon { gap: .2em; margin: 0 .06em; width: auto; }
+html[data-font="nothing"] .sbx[data-face="playful"] .sbx-colon i, html[data-font="nothing"] .sbx[data-face="tall"] .sbx-colon i { width: .085em; height: .085em; background: currentColor; }
+html[data-font="nothing"] .sbx[data-face="playful"] .sbx-colon { color: var(--sb-a); }
+html[data-font="nothing"] .sbx[data-face="tall"] .sbx-d { transform: none; }
+html[data-font="nothing"] .sbx[data-face="tall"] .sbx-clock { font-size: min(64cqh, 22cqw); }
 /* StandBy: #INAN tag top-left (aligned with the Focus pill's left edge), replaces the motive line */
 .sbx .sbx-row > .sbx-motive { visibility: hidden; }
 .sbx-tag { position: absolute; top: 6cqh; left: var(--sb-edge); z-index: 3; pointer-events: none;
-  font-family: var(--nf-dot) !important; font-size: max(7cqh, 22px); line-height: 1; letter-spacing: .06em !important; color: rgba(255, 255, 255, .9);
+  font-family: var(--pf-tag) !important; font-weight: 700; font-size: max(6cqh, 20px); line-height: 1; letter-spacing: .06em !important; color: rgba(255, 255, 255, .9);
   transition: left .9s var(--sb-ease), opacity .3s ease; }
 .sbx.with-media .sbx-tag { left: calc(var(--sb-edge) * .7); }
 .sbx.sbx-editing .sbx-tag { opacity: 0; }
@@ -2290,3 +2290,24 @@ body:has(.sbx.sbx-night) #dots { opacity: .25; }
 
 /* ---- local patch: StandBy burn-in drift (standby.js steps --sbx-dx/--sbx-dy every 2 min) ---- */
 .sbx { transform: translate(var(--sbx-dx, 0), var(--sbx-dy, 0)); }
+
+/* ---- local patch: font picker (hold the StandBy clock → "Aa" in the editor; stored on the phone, html[data-font]) ----
+   iPhone: Inter, the closest free match to SF Pro (SF Pro itself is licensed for Apple platforms only), everywhere.
+   Nothing: NType 82 + Ndot (block above). Rounded: Nunito. Android: the phone's own system font.
+   StandBy's playful and tall faces keep their display fonts except under Nothing. */
+@font-face { font-family: "PB Nunito"; src: url("fonts/Nunito-Variable.ttf") format("truetype"); font-weight: 200 1000; font-display: swap; }
+:root { --pf-text: Inter, sans-serif; --pf-clock: Inter, sans-serif; --pf-tag: Inter, sans-serif; }
+html[data-font="nothing"] { --pf-text: "NType", Inter, sans-serif; --pf-clock: "Ndot", "NType", Inter, sans-serif; --pf-tag: "Ndot", Inter, sans-serif; }
+html[data-font="rounded"] { --pf-text: "PB Nunito", Inter, sans-serif; --pf-clock: "PB Nunito", Inter, sans-serif; --pf-tag: "PB Nunito", Inter, sans-serif; }
+html[data-font="android"] { --pf-text: sans-serif; --pf-clock: sans-serif; --pf-tag: sans-serif; }
+html:not([data-font="nothing"]) body, html:not([data-font="nothing"]) body *:not(svg):not(svg *):not(.sbx-clock):not(.sbx-clock *) {
+  font-family: var(--pf-text) !important; }
+html[data-font="iphone"] body { font-feature-settings: "cv11", "ss03", "tnum"; }
+html:not([data-font="nothing"]) body :is(.clock, .t-val b, .g-val, .s-main b, .q-pct, .q-ov-val, .wc-t, .cd-v, .pv, .ct-n, .sw-t, .wx-temp, .br-c) {
+  font-family: var(--pf-clock) !important; font-variant-numeric: tabular-nums; }
+.sbx-ed-font { min-height: 44px; padding: 0 12px; border: none; border-radius: 999px; background: rgba(255, 255, 255, .1); color: #fff;
+  font-weight: 600; font-size: 15px; white-space: nowrap; cursor: pointer; }
+.sbx-ed-font:active { background: rgba(255, 255, 255, .2); }
+.sbx-ed-text { overflow: hidden; flex: 1 1 auto; }
+.sbx-ed-name, .sbx-ed-hint { overflow: hidden; text-overflow: ellipsis; }
+.sbx-swatches, .sbx-ed-font, .sbx-ed-done { flex: none; }
