@@ -7,7 +7,7 @@
 // Colours: hold the clock for the editor (swipe ← → colour, ↑ ↓ face, or tap a swatch); options.color sets the default.
 // While something plays on the computer the clock glides left and a frosted media panel (30 % wide) slides in on the
 // right; it leaves again after playback has been stopped for a short while.
-import { LOCALE, chime, clockPeriod, gotoPageRef, h, haptic, hour12, media, pad, quotaProviders, store, wxLines } from '../main.js';
+import { D, LOCALE, chime, clockPeriod, gotoPageRef, h, haptic, hour12, media, pad, quotaProviders, store, wxLines } from '../main.js';
 import { W } from '../registry.js';
 import { EXTRA_FACES } from './standby-faces.js';
 
@@ -68,6 +68,9 @@ const BREAK = { std: ['#30d158', '#7fe39a'], alt: ['#64d2ff', '#9be4ff'] }; // b
 const EDIT_IDLE_MS = 8000;
 const MEDIA_LINGER_MS = 20000; // paused/stopped media keeps its place this long (track changes, short pauses)
 const MIN = 60_000;
+const MAX_RUN_MS = 12 * 3_600_000; // a focus run ends after 12 h, like trackMe's (lib/timer/elapsed.ts)
+// writes only when the text changed: an equal write still replaces the text node and costs the panel a repaint
+const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; };
 
 // ---------------------------------------------------------------- pomodoro (as trackMe lib/timer/pomodoro.ts)
 // Phase i: even = work block i/2; odd = the break after it, long after every `cycles`-th work block.
@@ -186,7 +189,8 @@ W.standby = {
 
     const dayEl = h('b'), dateEl = h('span');
     const tempEl = h('div', 'sbx-temp');
-    const blocksEl = h('div', 'sbx-blocks');
+    const blocksN = h('span', '');
+    const blocksEl = h('div', 'sbx-blocks', h('span', 'sbx-b-ic', '◉'), blocksN);
     const side = h('div', 'sbx-side', h('div', 'sbx-day', dayEl, dateEl), tempEl, h('div', 'sbx-spacer'), blocksEl);
     stage.append(main, side);
 
@@ -200,15 +204,41 @@ W.standby = {
 
     // the media player: a real media widget on frosted glass, created once and kept, so it slides instead of rebuilding
     const mediaBox = h('div', 'w w-media sbx-media');
-    const glass = h('div', 'sbx-glass');
+    // the album-art glow: the art blurred once per track into a small canvas that the panel stretches (no CSS filter,
+    // which would blur it again on every repaint of the panel)
+    const glass = h('canvas', 'sbx-glass');
+    glass.width = glass.height = 64;
+    const gctx = glass.getContext('2d');
+    let glassSrc = '';
     let mediaInst = {};
     try { mediaInst = W.media.create(mediaBox, { ...ctx, w: { ...ctx.w, id: `${id}:media`, type: 'media', options: {} }, o: {}, box: mediaBox }) || {}; } catch (e) { console.warn('standby media', e); }
     mediaBox.prepend(glass);
     const art = mediaBox.querySelector('.art');
-    const syncGlass = () => { glass.style.backgroundImage = art?.classList.contains('on') && art.src ? `url("${art.src}")` : ''; };
+    const syncGlass = () => {
+      const ok = !!art && art.classList.contains('on') && art.complete && art.naturalWidth > 0;
+      const src = ok ? art.src : '';
+      if (src === glassSrc) return;
+      glassSrc = src;
+      if (!ok) { glass.classList.remove('on'); return; }
+      try {
+        gctx.clearRect(0, 0, 64, 64);
+        gctx.filter = 'blur(6px) saturate(1.4) brightness(.8)';
+        gctx.drawImage(art, -12, -12, 88, 88); // drawn past the edges so the blur doesn't fade them to black
+        gctx.filter = 'none';
+        glass.classList.add('on');
+      } catch (_) { glass.classList.remove('on'); }
+    };
     art?.addEventListener('load', syncGlass);
     art?.addEventListener('error', syncGlass);
     const mediaNeeds = mediaInst.needs || W.media.needs;
+    const mediaUpdate = (kind, background) => { try { mediaInst.update?.(kind, background); } catch (e) { console.warn('standby media', e); } };
+    let lastFastSec = -1, lastStateKey = '', lastStateAt = 0;
+    // what the media panel shows from a state update: the panel is redrawn only when one of these changed (or every
+    // 10 s, for the rarer things it also reads), not on every once-a-second state frame
+    const stateKey = () => {
+      const m = media, a = D.state?.audio;
+      return JSON.stringify([m && [m.phone, m.app, m.title, m.artist, m.album, m.durMs, m.playing, m.canSeek, m.artId], a && [a.volume, a.muted, a.canControl]]);
+    };
 
     // colour editor (hold the clock): frosted bar with the face name, swatches and Done
     const edName = h('div', 'sbx-ed-name');
@@ -299,14 +329,17 @@ W.standby = {
       // finish every phase that has ended (the panel may have been off for a while)
       let p = phaseNow();
       let rang = false;
-      while (pomo && !pomo.pausedAt && p && p.left <= 0) {
+      // a run is capped at 12 h (trackMe's rule): a session left running counts only the blocks that ended before that
+      const cap = pomo ? (pomo.runStart ?? pomo.phaseStart) + MAX_RUN_MS : 0;
+      while (pomo && !pomo.pausedAt && p && p.left <= 0 && pomo.phaseStart + p.len <= cap) {
         if (p.kind === 'work') { rollDay(); log.today += 1; log.lastEnd = pomo.phaseStart + p.len; saveLog(); }
-        pomo = { index: pomo.index + 1, phaseStart: pomo.phaseStart + p.len, pausedAt: null };
+        pomo = { index: pomo.index + 1, phaseStart: pomo.phaseStart + p.len, pausedAt: null, runStart: pomo.runStart };
         rang = true; p = phaseNow();
       }
+      if (pomo && Date.now() >= cap) { pomo = null; savePomo(); return; }
       if (rang) { savePomo(); try { chime(0.7, true); } catch (_) {} haptic(); }
     };
-    const start = () => { pomo = { index: 0, phaseStart: Date.now(), pausedAt: null }; savePomo(); haptic(); render(); };
+    const start = () => { const now = Date.now(); pomo = { index: 0, phaseStart: now, pausedAt: null, runStart: now }; savePomo(); haptic(); render(); };
     const stop = () => { pomo = null; savePomo(); haptic(); render(); };
     const togglePause = () => {
       if (!pomo) return;
@@ -351,7 +384,11 @@ W.standby = {
       const now = Date.now();
       if (media && media.playing) lastPlaying = now;
       const show = !!media && (media.playing || now - lastPlaying < MEDIA_LINGER_MS) && o.media !== false;
-      if (show !== shown) { shown = show; root.classList.toggle('with-media', show); mediaBox.inert = !show; syncGlass(); }
+      if (show !== shown) {
+        // the hidden panel gets no updates (see update()): bring it up to date before it slides in
+        if (show) { lastStateKey = stateKey(); lastStateAt = Date.now(); mediaUpdate('state'); lastFastSec = -1; mediaUpdate('fast'); }
+        shown = show; root.classList.toggle('with-media', show); mediaBox.inert = !show; syncGlass();
+      }
     };
 
     // ------------------------------------------------ render
@@ -381,6 +418,7 @@ W.standby = {
         glyphs[i] = g;
       }
     };
+    let lastMinute = -1;
     const render = () => {
       advance(); rollDay();
       const now = new Date();
@@ -393,28 +431,32 @@ W.standby = {
         const secs = Math.ceil(p.left / 1000);
         const mm = Math.floor(secs / 60), ss = secs % 60;
         setDigits((mm < 10 ? ' ' : '') + String(Math.min(mm, 99)) + pad(ss));
-        ap.textContent = '';
-        phaseEl.textContent = pomo.pausedAt ? 'Paused · tap to resume'
-          : `${PHASE_LABEL[p.kind]}${p.kind === 'work' ? ` · ${p.block}/${conf.cycles}` : ''}`;
-        focusBtn.textContent = '■ Stop';
+        setText(ap, '');
+        setText(phaseEl, pomo.pausedAt ? 'Paused · tap to resume'
+          : `${PHASE_LABEL[p.kind]}${p.kind === 'work' ? ` · ${p.block}/${conf.cycles}` : ''}`);
+        setText(focusBtn, '■ Stop');
       } else {
         const H = now.getHours(), h12 = hour12();
         const hh = h12 ? String(H % 12 || 12) : pad(H);
         setDigits((hh.length === 1 ? ' ' : '') + hh + pad(now.getMinutes()));
-        ap.textContent = h12 ? clockPeriod(now) : '';
-        phaseEl.textContent = '';
-        focusBtn.textContent = `▶ Focus ${conf.workMin}`;
+        setText(ap, h12 ? clockPeriod(now) : '');
+        setText(phaseEl, '');
+        setText(focusBtn, `▶ Focus ${conf.workMin}`);
       }
       // a running session keeps the panel out of the night screen until it ends or is paused
       globalThis.__sbxFocusing = !!p && !pomo.pausedAt;
-      blocksEl.replaceChildren(h('span', 'sbx-b-ic', '◉'), h('span', '', `${log.today}/${goal}`));
+      setText(blocksN, `${log.today}/${goal}`);
       // local patch: no motive line any more; the row keeps an empty spacer between Focus and AI
-      dayEl.textContent = now.toLocaleDateString(LOCALE, { weekday: 'short' }).replace('.', '').toUpperCase();
-      dateEl.textContent = ' ' + now.getDate();
-      const dl = now.toLocaleDateString(LOCALE, { weekday: 'short', day: 'numeric', month: 'short' });
-      if (dateLine.textContent !== dl) dateLine.textContent = dl;
+      // the date only changes with the minute (the clock itself sets the pace of everything else)
+      const minute = Math.floor(now.getTime() / MIN);
+      if (minute !== lastMinute) {
+        lastMinute = minute;
+        setText(dayEl, now.toLocaleDateString(LOCALE, { weekday: 'short' }).replace('.', '').toUpperCase());
+        setText(dateEl, ' ' + now.getDate());
+        setText(dateLine, now.toLocaleDateString(LOCALE, { weekday: 'short', day: 'numeric', month: 'short' }));
+      }
     };
-    const renderWeather = () => { const l = wxLines(); tempEl.textContent = l ? l.temp : ''; };
+    const renderWeather = () => { const l = wxLines(); setText(tempEl, l ? l.temp : ''); };
     const ring = (pct, color) => {
       const r = 15.9155, c = Math.max(0, Math.min(100, pct));
       const el = h('span', 'sbx-ring');
@@ -448,7 +490,17 @@ W.standby = {
         else if (kind === 'state') syncMedia();
         else if (kind === 'weather') renderWeather();
         else if (kind === 'quotas') renderQuota();
-        if (mediaNeeds.includes(kind)) { try { mediaInst.update?.(kind, background); } catch (e) { console.warn('standby media', e); } }
+        // the media panel: nothing while it is hidden, and its position at most once a second while it shows (the time
+        // on it only changes once a second); the 250 ms refresh and the once-a-second state were repainting it all the time
+        if (mediaNeeds.includes(kind)) {
+          if (kind === 'fast') {
+            const sec = Math.floor(Date.now() / 1000);
+            if (shown && sec !== lastFastSec) { lastFastSec = sec; mediaUpdate(kind, background); }
+          } else if (kind === 'state') {
+            const key = stateKey(), now = Date.now();
+            if (shown && (key !== lastStateKey || now - lastStateAt > 10_000)) { lastStateKey = key; lastStateAt = now; mediaUpdate(kind, background); }
+          } else mediaUpdate(kind, background);
+        }
       },
       destroy() { try { altFace?.destroy(); } catch (_) {} globalThis.__sbxFocusing = false; clearTimeout(holdTimer); clearTimeout(editTimer); try { mediaInst.destroy?.(); } catch (_) {} },
     };

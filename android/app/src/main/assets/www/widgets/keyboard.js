@@ -63,12 +63,15 @@ function createKeyboard(box, ctx) {
     const b = h('button', 'kbx-key', label);
     b.type = 'button';
     b.setAttribute('aria-label', label);
-    let hold = 0, rep = 0;
+    let hold = 0, rep = 0, busy = false;
+    // one press at a time: a repeat tick is skipped while the last press is still on its way, so a slow Wi-Fi moment
+    // doesn't queue up presses that land after the key was let go
+    const fire = () => { if (busy) return; busy = true; press(id).finally(() => { busy = false; }); };
     const stop = () => { clearTimeout(hold); clearInterval(rep); timers.delete(hold); timers.delete(rep); b.classList.remove('down'); };
     b.addEventListener('pointerdown', (e) => {
       e.preventDefault(); // keep the text box (and the phone keyboard) as they are
-      b.classList.add('down'); haptic(); press(id);
-      if (repeat) { hold = setTimeout(() => { rep = setInterval(() => press(id), 110); timers.add(rep); }, 420); timers.add(hold); }
+      b.classList.add('down'); haptic(); fire();
+      if (repeat) { hold = setTimeout(() => { rep = setInterval(fire, 110); timers.add(rep); }, 420); timers.add(hold); }
     });
     ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => b.addEventListener(ev, stop));
     grid.append(b);
