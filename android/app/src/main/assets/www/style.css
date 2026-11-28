@@ -2236,3 +2236,24 @@ body[data-theme]::before { display: none; }  /* no ambient gradient: flat black 
 /* playful: the clock sits a little higher so the date line fits above the pill row */
 .sbx[data-face="playful"] .sbx-stage { bottom: 19cqh; }
 .sbx[data-face="vapor"] .sbx-date { right: var(--ink-r, 0px); }
+
+/* --- local patch: Nothing typeface everywhere (NType 82 for text, Ndot 57 dot-matrix for clocks and big numbers).
+   The font files are Nothing's own and are kept out of git (.git/info/exclude); a build without them falls back to Inter. --- */
+@font-face { font-family: "NType"; src: url("fonts/NType82-Regular.otf") format("opentype"); font-weight: 100 599; font-display: block; }
+@font-face { font-family: "NType"; src: url("fonts/NType82-Headline.otf") format("opentype"); font-weight: 600 900; font-display: block; }
+@font-face { font-family: "Ndot"; src: url("fonts/Ndot57-Regular.otf") format("opentype"); font-display: block; }
+:root { --nf-text: "NType", Inter, sans-serif; --nf-dot: "Ndot", "NType", Inter, sans-serif; }
+html body, html body *:not(svg):not(svg *) { font-family: var(--nf-text) !important; font-feature-settings: normal; font-synthesis: none; }
+html body :is(.clock, .sbx-clock, .sbf, .t-val b, .g-val, .s-main b, .q-pct, .q-ov-val, .wc-t, .cd-v, .pv, .ct-n, .sw-t, .wx-temp, .br-c),
+html body :is(.clock, .sbx-clock, .sbf, .t-val b, .g-val, .s-main b, .q-pct, .q-ov-val, .wc-t, .cd-v, .pv, .ct-n, .sw-t, .wx-temp, .br-c) * {
+  font-family: var(--nf-dot) !important; font-weight: 400 !important; letter-spacing: .02em !important; }
+/* StandBy digits in Ndot: fixed-width slots (Ndot has no tabular figures), no overlap, dot-sized colon */
+.sbx-clock .sbx-d { width: .6em; justify-items: center; }
+.sbx[data-face="playful"] .sbx-clock { font-size: min(70cqh, 30cqw); line-height: .74; }
+.sbx[data-face="playful"] .sbx-d + .sbx-d, .sbx[data-face="playful"] .sbx-colon + .sbx-d { margin-left: 0; }
+.sbx[data-face="playful"] .sbx-d { mix-blend-mode: normal; }
+.sbx[data-face="playful"] .sbx-colon, .sbx[data-face="tall"] .sbx-colon { gap: .2em; margin: 0 .06em; width: auto; }
+.sbx[data-face="playful"] .sbx-colon i, .sbx[data-face="tall"] .sbx-colon i { width: .085em; height: .085em; background: currentColor; }
+.sbx[data-face="playful"] .sbx-colon { color: var(--sb-a); }
+.sbx[data-face="tall"] .sbx-d { transform: none; }
+.sbx[data-face="tall"] .sbx-clock { font-size: min(64cqh, 22cqw); }
