@@ -5,37 +5,182 @@ import { canKillAnywhere, dialEl, every } from './helpers.js';
 // ---------------------------------------------------------------- phone & PC
 // Your own HTML / CSS / JavaScript in a sandboxed iframe (no access to the panel, the agent or the phone). It gets
 // the panel's data through window.phonebox: phonebox.on('state' | 'push' | 'weather' | 'work' | 'quotas', fn),
-// phonebox.data, and may ask for phonebox.run(shortcutId) or phonebox.goto(page).
+// phonebox.data, and may ask for phonebox.run(shortcutId), phonebox.run(shortcutId, number) (for a key whose settings
+// give a value range, #677) or phonebox.goto(page).
+// A dragged slider calls run(id, value) for every move. The prelude sends one value per key at most every VALUE_GAP ms,
+// always the newest, and the last one when the moves stop, so the key ends where the slider did. The agent itself
+// refuses more than 4 values a second for one key (429). The pace runs on performance.now(), so a change of the wall
+// clock cannot hold a value back; each value carries when it was asked for (timeOrigin + now, a time every frame
+// shares, and never the same twice in one frame), so the panel can drop one that another widget has already overtaken. A value still held back when the
+// widget goes away (the layout is rebuilt on a turn of the phone) is sent as the frame unloads.
+export const VALUE_GAP = 300;
 export const HTML_PRELUDE = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark"><style>:root{color-scheme:dark}html,body{margin:0;height:100%;background:transparent;color:#eef2f6;font-family:Roboto,"Segoe UI",system-ui,sans-serif;overflow:hidden}</style>
-<script>(function(){var subs={},data={};window.phonebox={data:data,
+<script>(function(){var subs={},data={},vals=Object.create(null),last=0,post=function(m){m.frame='__PB_FRAME__';parent.postMessage(m,'*')};window.phonebox={data:data,
 on:function(k,f){(subs[k]=subs[k]||[]).push(f);if(data[k]!==undefined)try{f(data[k])}catch(e){console.error(e)}},
-run:function(id){parent.postMessage({phonebox:'run',id:String(id)},'*')},
+run:function(id,v){id=String(id);if(v===undefined||v===null)return post({phonebox:'run',id:id});v=Number(v);if(!isFinite(v))return;
+var now=performance.now(),q=vals[id]||(vals[id]={at:-1e9});q.v=v;q.asked=last=Math.max(performance.timeOrigin+now,last+0.001);if(q.timer)return;var wait=q.at+${VALUE_GAP}-now;
+if(wait<=0){q.at=now;return post({phonebox:'run',id:id,value:v,asked:q.asked})}
+q.timer=setTimeout(function(){q.timer=0;q.at=performance.now();post({phonebox:'run',id:id,value:q.v,asked:q.asked})},wait)},
 goto:function(p){parent.postMessage({phonebox:'goto',page:p},'*')}};
+addEventListener('pagehide',function(){for(var id in vals){var q=vals[id];if(q.timer){clearTimeout(q.timer);q.timer=0;post({phonebox:'run',id:id,value:q.v,asked:q.asked})}}});
 addEventListener('message',function(e){var m=e.data;if(!m||m.phonebox!=='data')return;data[m.kind]=m.value;(subs[m.kind]||[]).forEach(function(f){try{f(m.value)}catch(err){console.error(err)}})});})();<\/script>`;
 export const HTML_KINDS = ['state', 'push', 'weather', 'work', 'quotas'];
+
+const httpUrl = (v) => (typeof v === 'string' && /^https?:\/\/[^\s]+$/i.test(v.trim()) ? v.trim() : '');
+
+// A web page by address (http or https), in a frame of its own: it loads in its own origin, so it keeps its storage and
+// cookies (a sign-in) yet cannot reach the panel, and it may not navigate the panel away. No popups either: the app has
+// no second window, so a link opening one would replace the panel.
+// Android 5 and 6 do not read network_security_config, which keeps a redirect from bringing someone else's page to the
+// panel's http address, so no web page is shown there.
+const androidVersion = Number((/Android (\d+)/.exec(navigator.userAgent) || [])[1]);
+export const webPagesAllowed = !(androidVersion < 7);
+
+function webFrame(box, url) {
+  if (!webPagesAllowed) {
+    box.append(h('div', 'empty', tp('A web page needs Android 7 or later')));
+    return null;
+  }
+  const frame = h('iframe', 'html-frame');
+  frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-modals allow-downloads');
+  frame.setAttribute('allow', 'fullscreen; autoplay');
+  frame.src = url;
+  // Not clipped by the card's rounded corners: Android WebView then drops the page's own rounded clips (cards
+  // of a Home Assistant dashboard draw their graphs and blurred art as plain rectangles).
+  box.classList.add('url-html');
+  box.append(frame);
+  return frame;
+}
+
+// The value runs of each key, shared by every Custom HTML widget (two widgets can drive the same key). A value asked
+// for before one already taken is dropped. One request at a time, at most one every VALUE_GAP ms whichever widget sent
+// it, and only the newest waits, so the agent runs them in order and the key ends on the latest. A value the agent
+// refused as too fast (429: another page or script used the key's 4 a second) is tried once more a second later, when
+// that window has passed, unless a newer value came meanwhile; refused again, the panel says so instead of dropping it
+// unseen. A widget that goes away leaves its last value to finish.
+const valueRuns = new Map(); // shortcut id -> { asked, sent, busy, timer, next }
+function runValue(id, value, asked) {
+  let st = valueRuns.get(id);
+  if (!st) valueRuns.set(id, st = { asked: -Infinity, sent: -Infinity, busy: false, timer: 0, next: null });
+  // a tie (two widgets in the same clock tick) goes to the value already taken
+  if (Number.isFinite(asked)) { if (asked <= st.asked) return; st.asked = asked; }
+  st.next = { value };
+  pumpValue(id, st);
+}
+function pumpValue(id, st) {
+  if (st.busy || st.timer || !st.next) return;
+  const wait = st.sent + VALUE_GAP - performance.now();
+  if (wait > 0) { st.timer = setTimeout(() => { st.timer = 0; pumpValue(id, st); }, wait); return; }
+  const { value, retry = false } = st.next;
+  st.next = null;
+  if (!retry && performance.now() - st.sent > 1000) haptic(); // once when a drag starts
+  const sentAt = st.sent = performance.now();
+  st.busy = true;
+  // the page's arithmetic can leave 0.30000000000000004: twelve decimals are kept, as the agent takes
+  api('/run/' + encodeURIComponent(id) + '?value=' + encodeURIComponent(String(+value.toFixed(12))), 'POST', 5000)
+    .then(() => null, (err) => err?.status ?? 0)
+    .then((status) => {
+      st.busy = false;
+      if (st.next) { pumpValue(id, st); return; }
+      if (status === 429 && !retry) setTimeout(() => { if (st.sent === sentAt && !st.busy && !st.next) { st.next = { value, retry: true }; pumpValue(id, st); } }, 1000);
+      else if (status === 400 || status === 429) toast(t('panel.valueRefused'), 'err');
+      else if (status !== null) toast(t('panel.pcNoAnswer'), 'err');
+    });
+}
 
 W.html = {
   needs: HTML_KINDS,
   create(box, { o }) {
     if (o.transparent) box.classList.add('bare-html');
+    const url = httpUrl(o.url);
+    if (url) {
+      webFrame(box, url);
+      return { update() {}, destroy() {} };
+    }
     const frame = h('iframe', 'html-frame');
     frame.setAttribute('sandbox', 'allow-scripts');
     frame.setAttribute('referrerpolicy', 'no-referrer');
-    frame.srcdoc = HTML_PRELUDE + (o.html || '');
+    // a token of this frame's own in its prelude: its messages are known by it even once the iframe is gone (a removed
+    // frame has no contentWindow left to compare), and no other widget's page can read it
+    const token = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+    frame.srcdoc = HTML_PRELUDE.replace('__PB_FRAME__', token) + (o.html || '');
     box.append(frame);
     const send = (kind) => { if (D[kind] != null) try { frame.contentWindow?.postMessage({ phonebox: 'data', kind, value: D[kind] }, '*'); } catch (_) {} };
     frame.addEventListener('load', () => HTML_KINDS.forEach(send));
+    let gone = false;
     const onMsg = (e) => {
-      if (e.source !== frame.contentWindow || !e.data) return;
-      if (e.data.phonebox === 'run' && (cfg.shortcuts || []).some((s) => s.id === e.data.id)) { haptic(); api('/run/' + encodeURIComponent(e.data.id), 'POST', 5000).catch(() => toast(t('panel.pcNoAnswer'), 'err')); }
-      if (e.data.phonebox === 'goto') gotoPageRef(e.data.page);
+      if (!e.data || (e.source !== frame.contentWindow && e.data.frame !== token)) return;
+      const m = e.data;
+      if (gone && !(m.phonebox === 'run' && 'value' in m)) return;
+      if (m.phonebox === 'run' && (cfg.shortcuts || []).some((s) => s.id === m.id)) {
+        if (!('value' in m)) { haptic(); api('/run/' + encodeURIComponent(m.id), 'POST', 5000).catch(() => toast(t('panel.pcNoAnswer'), 'err')); }
+        else if (typeof m.value === 'number' && Number.isFinite(m.value)) runValue(m.id, m.value, m.asked);
+      }
+      if (m.phonebox === 'goto') gotoPageRef(m.page);
     };
     window.addEventListener('message', onMsg);
     return {
       update(kind) { if (HTML_KINDS.includes(kind)) send(kind); },
-      destroy() { window.removeEventListener('message', onMsg); },
+      // a moment more for the value a removed frame sends as it unloads
+      destroy() { gone = true; setTimeout(() => window.removeEventListener('message', onMsg), 1000); },
     };
+  },
+};
+
+// A Home Assistant dashboard as it is: the phone opens the server itself (the address in Settings › General, or the
+// widget's own). Until the server answers, the widget says so and keeps trying; when it answers again after an outage,
+// the page is reloaded. Without an address of its own the widget tries the one from Settings first, then the IP
+// addresses the computer found for a .local name: the computer may be on another network than the phone, so the first
+// one that answers is used.
+// Sign-in is Home Assistant's own: its sign-in page shows in the frame once (or a trusted network skips it), and Home
+// Assistant keeps the session in the frame's own storage. The token from Settings › General stays on the computer.
+// "kiosk" adds ?kiosk, which kiosk-mode (a Home Assistant add-on) reads to hide the header and the sidebar in this
+// frame only; without kiosk-mode it does nothing.
+const HA_DASH_PATH = /^[\w.~-]+(\/[\w.~-]+)*$/;
+W.hadash = {
+  needs: [],
+  create(box, { o, page }) {
+    if (o.transparent !== false) box.classList.add('bare-html');
+    const own = httpUrl(o.address);
+    const bases = [...new Set((own ? [own] : [cfg.homeAssistant?.url, ...(cfg.homeAssistant?.alternatives || [])])
+      .map(httpUrl).filter(Boolean).map((b) => b.replace(/\/+$/, '')))];
+    const message = (text) => box.replaceChildren(h('div', 'empty', text));
+    if (!bases.length) { message(t('w.hadash.setup')); return { update() {}, destroy() {} }; }
+    if (!webPagesAllowed) { message(tp('A web page needs Android 7 or later')); return { update() {}, destroy() {} }; }
+    const path = String(o.dashboard || '').trim().replace(/^\/+|\/+$/g, '');
+    const dashboard = '/' + (HA_DASH_PATH.test(path) ? path : 'lovelace');
+    // ?kiosk asks kiosk-mode to hide Home Assistant's header and sidebar
+    const query = o.kiosk !== false ? '?kiosk' : '';
+    // a no-cors request: it fails only when the server cannot be reached, which is all this needs to know
+    const answers = async (base) => {
+      const abort = new AbortController();
+      const stop = setTimeout(() => abort.abort(), 8000);
+      try { await fetch(base + '/manifest.json', { mode: 'no-cors', cache: 'no-store', signal: abort.signal }); return true; } catch (_) { return false; } finally { clearTimeout(stop); }
+    };
+    let frame = null, shown = '', down = false, timer = 0, gone = false, due = 0;
+    // Home Assistant is asked only while the widget is on screen (not on a neighbouring page, a Smart Stack card that
+    // isn't showing or with the app in the background); it catches up within a second of showing. A dashboard
+    // already open stays loaded, so that going back to the page does not sign in and load it again.
+    const visible = () => box.isConnected && !document.hidden && pages[curPage] === page && !box.closest('.stack-item:not(.active)');
+    const check = async () => {
+      if (gone) return;
+      if (!visible() || Date.now() < due) { timer = setTimeout(check, 1000); return; }
+      // the address in use first, then the others in order
+      let up = '';
+      for (const base of shown ? [shown, ...bases.filter((b) => b !== shown)] : bases) {
+        if (await answers(base)) { up = base; break; }
+        if (gone) return;
+      }
+      if (gone) return;
+      if (up && (!frame || down || up !== shown)) { box.replaceChildren(); frame = webFrame(box, up + dashboard + query); shown = up; }
+      else if (!up && !frame) message(t('w.hadash.offline'));
+      down = !up;
+      due = Date.now() + (up ? 60000 : 15000);
+      timer = setTimeout(check, 1000);
+    };
+    check();
+    return { update() {}, destroy() { gone = true; clearTimeout(timer); } };
   },
 };
 

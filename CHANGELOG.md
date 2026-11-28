@@ -2,6 +2,68 @@
 
 ## Unreleased
 
+## 0.9.32 — 2026-11-27
+
+- Pi agent sessions in the AI sessions widget: model, thinking level, last tool, token counters, the current context
+  size and the context window (when Pi's cached model store knows it), and whether a turn is running: a failed reply
+  finishes at once, its automatic retry puts the row back to working, and a turn that has written nothing for half an
+  hour settles as idle instead of hanging on. Off by default
+  (**Settings › General › Pi sessions**), and session titles reach the phone only with their own switch on. The agent
+  reads the local session files for their metadata only; prompts, replies and tool arguments are never kept or sent
+  (#675, [0xTankBuilds](https://github.com/0xTankBuilds)).
+- **Romanian** (Română) joins the interface languages: the panel, the settings page, the widget and template catalog,
+  the Windows tray, the Android pairing and phone-bridge dialogs, and a Romanian README. Pick it in Settings › General ›
+  Language, or it follows a phone set to Romanian (#671, [GabrielUlici](https://github.com/GabrielUlici)).
+- Stocks: A-share names such as 上证指数 show in full instead of two characters and an ellipsis; the name column fits
+  the longest name in the list, and exchange and crypto rows keep their layout (#674,
+  [elong365](https://github.com/elong365)).
+- Stocks: US and Hong Kong stocks show their English names (`Amazon.Com, Inc.`, `TENCENT`) when the panel language
+  is not Chinese and the quote feed has one; a Chinese panel keeps the Chinese names (#678, #679,
+  [Seyamalam](https://github.com/Seyamalam)).
+- Steam library: a cover cache folder (`appcache/librarycache`) that is itself a symbolic link or junction is refused,
+  like the folders below it, so covers are never served from outside Steam's cache (#684,
+  [Seyamalam](https://github.com/Seyamalam)).
+- Custom HTML: **Web page address** shows a web page instead of your own HTML, such as a Home Assistant dashboard,
+  Grafana or a camera on the home network (Android 7 or later). Plain http addresses work too (the panel is now served
+  over http inside the app, so the page and its pictures are not blocked as mixed content). The page runs in its own
+  origin and keeps its sign-in, cannot reach the panel or navigate it away, and is not clipped to the card's rounded
+  corners, because Android WebView then drops the rounded corners the page draws itself. Inside the http panel an https
+  page is not a secure context, so the few pages that need `crypto.subtle` or a service worker do not work there (#619,
+  [dancho12](https://github.com/dancho12)).
+- Trackpad: a two-finger scroll no longer nudges the cursor when the fingers land or lift a moment apart, and a tap
+  no longer moves it by a few pixels. **Inertial scrolling** (on by default, in the widget's Scrolling settings) lets a
+  two-finger flick coast on and slow down (#676, [Prajjwal2404](https://github.com/Prajjwal2404)).
+- Night screen: touching or dragging keeps it from turning on under your finger. Every touch restarts the 30-second
+  dark-room countdown and wake hold, so a scheduled night, a dark room or a rule's night action waits until 30 seconds
+  after you let go; the Stay and Go now buttons of a page switch do not count (#670,
+  [Prajjwal2404](https://github.com/Prajjwal2404)).
+- **Home Assistant dashboard**: a Home Assistant dashboard as it is, with its own cards (Android 7 or later). The phone
+  opens it from the server in Settings › General (or an address of its own) and signs in to Home Assistant itself, once,
+  as a Home Assistant user; the token stays on the computer and only lists the dashboards and views to pick from in the
+  widget's settings, with what Home Assistant needs. The widget hides Home Assistant's header and sidebar with
+  kiosk-mode. While the server does not answer, the widget says so and tries again. See
+  [docs/HOME-ASSISTANT.md](docs/HOME-ASSISTANT.md) (#620, [dancho12](https://github.com/dancho12)).
+- Android: the notice for a WebView too old to run the panel names the version in use, such as `(version 37)`. On
+  Android 5 and 6 a phone maker's own WebView can stay in use although Google's is installed from Google Play, and the
+  version shows which one the panel got (#689).
+- macOS: when the sound goes to an output macOS cannot control in software (a monitor or soundbar over HDMI), the
+  agent reads its volume every 10 seconds instead of every second. Each reading starts `osascript`, and at one a
+  second WindowServer ran out of resources after a few days and logged the user out (#693,
+  [AlphaRishi1229](https://github.com/AlphaRishi1229)).
+- macOS: an output whose volume `osascript` can never read (HDMI) is tried less and less often, up to every 5 minutes,
+  and read again at once when another output is chosen (#695, #697, [AlphaRishi1229](https://github.com/AlphaRishi1229)).
+- macOS: Now playing asks Spotify or Music through `osascript` only while one of them runs, checked in-process, so an
+  idle Mac no longer starts that helper every few seconds (#695, #699, [AlphaRishi1229](https://github.com/AlphaRishi1229)).
+- Custom HTML: a page can send a number with a run, `phonebox.run('seek', 37)`, and a script can call
+  `POST /api/run/seek?value=37`, so a seek bar or a slider needs one shortcut instead of one per position. A shortcut
+  takes a number only when its settings give it a range (*Takes a number from a Custom HTML page or a script*); the
+  agent checks the number and writes it itself. A program starts without the shell with the number as its own argument
+  (in place of `{value}`, or at the end), an address takes it in place of `{value}` in the address, and at most 4
+  numbers a second reach one shortcut (#677, #687, [mayankbohradev](https://github.com/mayankbohradev)).
+- Windows: the live Codex quota finds the Codex desktop app's CLI even when a `codex.cmd` of your own (a wrapper that
+  forwards to it) is on `PATH`. Only npm's `codex.cmd` is used now; another one used to stop the search with "Could not
+  locate the npm Codex binary" (#709, [harafuhub](https://github.com/harafuhub)).
+
 ## 0.9.31 — 2026-11-27
 
 - Pages: a dimmed **photo background** per page, from the Photo frame's source (a folder or an Immich album). A new

@@ -682,8 +682,8 @@ W.sessions = {
     const tokens = (n) => n == null ? '—' : n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : String(n);
     const statusText = (s) => s.status === 'busy' ? t('sess.working') : s.status === 'waiting' ? t('sess.waiting') : s.status === 'shell' ? t('sess.shell') : s.outcome === 'completed' ? t('sess.completed') : s.outcome === 'failed' ? t('sess.failed') : s.outcome === 'aborted' ? t('sess.aborted') : t('sess.idle');
     // The tool each session comes from: one glyph in the list, a glyph and a name in the details panel.
-    const toolIcon = (tool) => tool === 'claude' ? '✳' : tool === 'codex' ? '◎' : tool === 'cursor' ? '◆' : tool === 'opencode' ? '◈' : tool === 'antigravity' ? Q_STYLE.antigravity.logo : tool === 'grok' ? Q_STYLE.grok.logo : tool === 'workbuddy' ? '❖' : '◎';
-    const toolTitle = (tool) => tool === 'claude' ? 'Claude Code' : tool === 'codex' ? 'Codex' : tool === 'cursor' ? 'Cursor' : tool === 'opencode' ? 'OpenCode' : tool === 'antigravity' ? 'Antigravity' : tool === 'grok' ? 'Grok' : tool === 'workbuddy' ? 'WorkBuddy' : 'Codex';
+    const toolIcon = (tool) => tool === 'claude' ? '✳' : tool === 'codex' ? '◎' : tool === 'cursor' ? '◆' : tool === 'opencode' ? '◈' : tool === 'antigravity' ? Q_STYLE.antigravity.logo : tool === 'grok' ? Q_STYLE.grok.logo : tool === 'workbuddy' ? '❖' : tool === 'pi' ? 'π' : '◎';
+    const toolTitle = (tool) => tool === 'claude' ? 'Claude Code' : tool === 'codex' ? 'Codex' : tool === 'cursor' ? 'Cursor' : tool === 'opencode' ? 'OpenCode' : tool === 'antigravity' ? 'Antigravity' : tool === 'grok' ? 'Grok' : tool === 'workbuddy' ? 'WorkBuddy' : tool === 'pi' ? 'Pi' : 'Codex';
     const ageText = (since) => Date.now() - since < 60_000 ? 'just now' : shortDur(Date.now() - since) + ' ago';
     // A session's title is the main label and the project folder goes under it: Claude Code sends it only while
     // Settings › Claude Code › "Show session titles on the phone" is on, OpenCode only while "Show OpenCode session
@@ -789,12 +789,14 @@ W.sessions = {
         ['Cached input', s.cachedInputTokens != null ? tokens(s.cachedInputTokens) : null],
         ['Reasoning output', s.reasoningTokens != null ? tokens(s.reasoningTokens) : null],
         ['Last input / context window', s.lastInputTokens != null && s.contextWindow ? `${tokens(s.lastInputTokens)} / ${tokens(s.contextWindow)}` : null],
+        // Pi (and friends) without a known context window: the current context size on its own
+        ['Context', s.lastInputTokens != null && s.contextWindow == null ? tokens(s.lastInputTokens) : null],
         ['Recent tool', s.lastTool],
       ];
       // a small label over each value, four to a row: the facts take one line instead of four
       panel.append(h('div', 'session-grid', rows.filter(([, value]) => value != null)
         .map(([label, value]) => h('div', 'session-cell', h('span', null, tp(label)), h('strong', null, value)))));
-      if (s.tool === 'codex' || s.tool === 'grok' || (s.tool === 'antigravity' && s.totalTokens != null)) panel.append(h('p', 'session-note', tp('Token totals are for this local session, not your account allowance.')));
+      if (s.tool === 'codex' || s.tool === 'grok' || (s.tool === 'antigravity' && s.totalTokens != null) || (s.tool === 'pi' && s.totalTokens != null)) panel.append(h('p', 'session-note', tp('Token totals are for this local session, not your account allowance.')));
       if (s.tool === 'claude') stopConversation = conversationSection(panel, s);
       backdrop.append(panel);
       document.body.append(backdrop);

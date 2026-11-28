@@ -31,7 +31,8 @@ public static class Shortcuts
     }
 
     /// <returns>An error message, or null on success.</returns>
-    public static string? Run(AgentConfig cfg, string id, ILogger log, PushStore? push = null, AudioControl? audio = null, bool hold = false)
+    /// <param name="number">A number for a key that takes one (see <see cref="ShortcutValues"/>); only a checked value gets here.</param>
+    public static string? Run(AgentConfig cfg, string id, ILogger log, PushStore? push = null, AudioControl? audio = null, bool hold = false, CheckedValue? number = null)
     {
         var sc = cfg.Shortcuts.FirstOrDefault(s => s.Id == id);
         if (sc is null) return $"no such shortcut: {id}";
@@ -39,14 +40,16 @@ public static class Shortcuts
         if (hold)
         {
             if (sc.LongPress is null || cfg.Shortcuts.FirstOrDefault(s => s.Id == sc.LongPress) is not { } held) return $"shortcut {id} has no long press";
+            if (number is not null) return "a long press takes no value";
             sc = held;
         }
-        return RunCore(cfg, sc, log, push, audio, 0);
+        return RunCore(cfg, sc, log, push, audio, 0, number);
     }
 
-    private static string? RunCore(AgentConfig? cfg, Shortcut sc, ILogger log, PushStore? push, AudioControl? audio, int depth)
+    private static string? RunCore(AgentConfig? cfg, Shortcut sc, ILogger log, PushStore? push, AudioControl? audio, int depth, CheckedValue? number = null)
     {
-        if (!sc.Toggle) return Execute(sc, log, cfg, depth, push, audio);
+        if (!sc.Toggle) return Execute(sc, log, cfg, depth, push, audio, number);
+        if (number is not null) return "an on / off key takes no value";
         var on = State(sc, push, audio) ?? false;
         var target = on && sc.OffCmd is not null ? new Shortcut { Label = sc.Label, Cmd = sc.OffCmd, Args = sc.OffArgs, Cwd = sc.Cwd } : sc;
         var err = Execute(target, log, cfg, depth, push, audio);
@@ -246,10 +249,11 @@ public static class Shortcuts
     }
 
     /// <returns>An error message, or null on success.</returns>
-    public static string? Execute(Shortcut sc, ILogger log, AgentConfig? cfg = null, int depth = 0, PushStore? push = null, AudioControl? audio = null)
+    public static string? Execute(Shortcut sc, ILogger log, AgentConfig? cfg = null, int depth = 0, PushStore? push = null, AudioControl? audio = null, CheckedValue? number = null)
     {
         try
         {
+            if (number is not null && (sc.Value is null || !ShortcutValues.CanTake(sc))) throw new InvalidOperationException("this shortcut takes no value");
             switch (sc.Cmd)
             {
                 case "builtin:cycle":
@@ -332,7 +336,7 @@ public static class Shortcuts
                     break;
 #endif
                 default:
-                    Start(sc);
+                    Start(sc, number);
                     break;
             }
             log.LogInformation("shortcut: {Label}", sc.Label);
@@ -345,17 +349,50 @@ public static class Shortcuts
         }
     }
 
-    private static void Start(Shortcut sc)
+    /// <summary>A test sees what a key would start instead of starting it (per test: an AsyncLocal, so parallel tests don't mix).</summary>
+    internal static readonly AsyncLocal<Action<ProcessStartInfo>?> TestStart = new();
+
+    /// <summary>
+    /// What a key starts. A key without a range starts as it always did: through the shell, with its configured text.
+    /// A key with a range that names a program starts it directly, without the shell, with one argument each, and the
+    /// agent's own text for the checked number as an argument of its own (<see cref="ShortcutValues.Arguments"/>). A key
+    /// with a range that opens an address gets the number in place of {value} in the address. No text from a request
+    /// reaches either.
+    /// </summary>
+    internal static ProcessStartInfo StartInfo(Shortcut sc, CheckedValue? value)
     {
-        var psi = new ProcessStartInfo(Home(sc.Cmd), Home(sc.Args ?? "")) { UseShellExecute = true };
+        ProcessStartInfo psi;
+        if (sc.Value is null) psi = new ProcessStartInfo(Home(sc.Cmd), Home(sc.Args ?? "")) { UseShellExecute = true };
+        else if (ShortcutValues.Program(sc.Cmd, sc.Cwd) is { } program)
+        {
+            psi = new ProcessStartInfo(program) { UseShellExecute = false };
+            foreach (var arg in ShortcutValues.Arguments(sc.Args, value)) psi.ArgumentList.Add(Home(arg));
+        }
+        else
+        {
+            // checked as a program or an address a moment ago: if it is neither now (the file went away), fail rather than
+            // open it without the number
+            if (value is not null && !(ShortcutValues.IsAddress(sc.Cmd) && sc.Cmd.Contains(ShortcutValues.Placeholder, StringComparison.Ordinal)))
+                throw new InvalidOperationException("the shortcut's program is not there any more");
+            var address = sc.Cmd.Replace(ShortcutValues.Placeholder, value?.Text ?? "", StringComparison.Ordinal);
+            psi = new ProcessStartInfo(Home(address), Home(ShortcutValues.WithoutPlaceholder(sc.Args) ?? "")) { UseShellExecute = true };
+        }
         if (!string.IsNullOrEmpty(sc.Cwd)) psi.WorkingDirectory = Home(sc.Cwd);
+        return psi;
+    }
+
+    private static void Start(Shortcut sc, CheckedValue? value)
+    {
+        var psi = StartInfo(sc, value);
+        if (TestStart.Value is { } test) { test(psi); return; }
 #if WINDOWS
         LetTheNewWindowComeForward();
         try
         {
             Process.Start(psi);
         }
-        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 2 /* not found */ && TerminalStandIns(sc.Cmd)
+        // a stand-in starts without arguments, so a key run with a number fails instead of dropping it
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 2 /* not found */ && value is null && TerminalStandIns(sc.Cmd)
             .Select(t => Path.Combine(Environment.SystemDirectory, t == "powershell.exe" ? @"WindowsPowerShell\v1.0\powershell.exe" : t))
             .FirstOrDefault(File.Exists) is { } alt)
         {
@@ -363,7 +400,7 @@ public static class Shortcuts
         }
 #else
         // a missing program does not throw here: .NET hands the name to xdg-open, which fails on its own
-        if (TerminalStandIns(sc.Cmd, Environment.GetEnvironmentVariable("TERMINAL")) is { Length: > 0 } alts && Sh.Which(sc.Cmd) is null
+        if (value is null && TerminalStandIns(sc.Cmd, Environment.GetEnvironmentVariable("TERMINAL")) is { Length: > 0 } alts && Sh.Which(sc.Cmd) is null
             && alts.Select(Sh.Which).FirstOrDefault(p => p is not null) is { } alt)
         {
             StartStandIn(alt, sc);
@@ -403,7 +440,7 @@ public static class Shortcuts
     };
 
     /// <summary>"~" at the start of a path means the home folder (Linux / macOS style).</summary>
-    private static string Home(string s) =>
+    internal static string Home(string s) =>
         s == "~" || s.StartsWith("~/") ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + s[1..] : s.Replace(" ~/", " " + Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "/");
 
 #if WINDOWS

@@ -67,6 +67,23 @@ people who proposed or prototyped something are credited in the [changelog](../C
   with Windows' own H.264 decoder and delivered as an OBS source or a Windows 11 virtual camera (not by writing into
   OBS's virtual camera); no new downloads, and start, stop and state visible on the phone. A small prototype and a
   design note first.
+- **The playing app's volume in Now playing** ([#673](https://github.com/ersinkoc/phonebox/issues/673)), Windows, the
+  first of two pull requests: a widget option that makes the slider control the Core Audio session of the app behind
+  the media session (a browser's own session; a WebView2 app through its parent process), with the master volume as a
+  second slider below it. The source icon may show a known site taken from the browser's window title; the title
+  itself stays on the computer. No mixer column inside Now playing: the Application mixer widget already does that.
+- **A preview of the computer's own cameras** ([#673](https://github.com/ersinkoc/phonebox/issues/673)), Windows, the
+  second pull request: webcams through `MediaCapture` in shared read-only mode (never taking the camera from another
+  app), and DirectShow-only virtual cameras through ffmpeg's `dshow` input, as about 5 JPEG frames a second at 640 px
+  in the Camera widget. Off by default behind a switch in Settings on the computer (the phone cannot turn it on),
+  only while the widget is on screen, and PhoneBox lets go of the camera a few seconds after the last request (its
+  light stays on only if another app is using it). Frames are not stored or logged.
+- **WorkBuddy follow-ups** ([#700](https://github.com/ersinkoc/phonebox/issues/700), pull requests
+  [#701](https://github.com/ersinkoc/phonebox/pull/701), [#702](https://github.com/ersinkoc/phonebox/pull/702),
+  [#703](https://github.com/ersinkoc/phonebox/pull/703)): session rows that never look healthy on a lost feed (an
+  `unknown` state when the heartbeat is old) and a WorkBuddy self-check; approval cards with a countdown, the full
+  detail, and a second tap for high-risk tools decided on the agent; and, off by default, notifications and a rule
+  trigger when a WorkBuddy chat fails or finishes.
 
 ## Open for a contributor
 
@@ -99,8 +116,27 @@ Agreed in principle, not being built in-house. Say so on the issue before starti
   list, the default microphone, switching the default device and per-app volume through `pactl` (sinks, sources and
   sink inputs; PipeWire answers it too), with a forced C locale for parsing. Today these are Windows-only and the
   Linux agent controls only the system output.
+- **Synced lyrics from files on the computer** ([#669](https://github.com/ersinkoc/phonebox/issues/669)): `.lrc`
+  files from a folder chosen in Settings on the computer, matched by artist and title, as a source before or instead
+  of LRCLIB in the Synced lyrics widget. Off until a folder is set; the agent reads only `.lrc` files inside that
+  folder (no path patterns from the phone), and the folder's path never goes to the phone.
+- **Another agent port than 8765** ([#682](https://github.com/ersinkoc/phonebox/issues/682)): one saved port the
+  installed agent reads at startup (`--port` stays the development option). Setup offers a free port only when 8765
+  is taken, or takes `-Port` / `--port` for scripted installs, and keeps it on update. Changing it later updates the
+  autostart entry and the Claude Code and Cursor hooks, and warns that the Spotify redirect URI changes too. The
+  phones are unaffected: USB maps the phone's 8765 to the agent, and Wi-Fi has its own port.
 - **A larger device switcher** ([#340](https://github.com/ersinkoc/phonebox/issues/340)): bigger touch targets for the
   computers in the all-pages overview, each with an icon (emoji or uploaded picture) and a colour set per computer.
+- **macOS: Now playing without a helper start per reading** ([#695](https://github.com/ersinkoc/phonebox/issues/695)):
+  read Now Playing from one long-running helper that reports changes (or in-process) instead of starting
+  `nowplaying-cli` every few seconds. Each start adds to WindowServer's Mach ports, which macOS does not give back, until the user is logged
+  out after days.
+- **Say why the agent can't start when its port is taken** ([#710](https://github.com/ersinkoc/phonebox/issues/710)):
+  before the host starts, check the local port the agent is about to listen on (8765, or `--port`) the way
+  `Lan.PortProblem` checks the Wi-Fi port. When it is taken,
+  log one `crit` line naming the port and, where it can be found, the program holding it, and show it (Windows: a
+  message box in the tray's language, macOS/Linux: stderr and a notification) instead of exiting silently; the
+  background services' cancellations during that shutdown stay out of the log.
 
 ## Waiting on someone else
 
@@ -134,6 +170,11 @@ Agreed in principle, not being built in-house. Say so on the issue before starti
   panel calls the same 14 ms haptic for every widget, and `dumpsys vibrator` showed no vibration from the app at all,
   so whether the phone drops short vibrations needs `adb shell dumpsys vibrator` right after a shortcut tap and an HA
   tap, and MIUI's touch-vibration setting.
+- **Spotify queue: a tapped track still replaces what is playing in 0.9.31**
+  ([#668](https://github.com/ersinkoc/phonebox/issues/668)): since 0.9.30 a tapped track starts inside the playing
+  playlist or album, but the Web API takes a starting track only there, so Liked Songs, an artist, a radio or mix and
+  hand-queued tracks still play it on its own. Where the music was playing from, and `agent.log` right after a tap,
+  are needed.
 
 ## How to help
 

@@ -34,6 +34,8 @@ public sealed class AgentConfig
     public CursorConfig Cursor { get; set; } = new();
     /// <summary>Clipboard sharing with the paired phone (macOS only; off by default).</summary>
     public BridgeConfig Bridge { get; set; } = new();
+    /// <summary>Pi agent sessions on the AI sessions widget (off by default).</summary>
+    public PiConfig Pi { get; set; } = new();
     /// <summary>Antigravity chats on the AI sessions widget (off by default).</summary>
     public AntigravityConfig Antigravity { get; set; } = new();
     /// <summary>OpenCode prompts and sessions on the phone; everything is off until the settings page turns it on.</summary>
@@ -128,6 +130,10 @@ public sealed class AgentConfig
         // the bridge switches: the phone's Phone bridge screen follows them (nothing here is a secret). "supported" is what the
         // panel's Phone bridge button waits for: on Windows and Linux there is no bridge, and the screen could only say so.
         bridge = new { Bridge.Clipboard, Bridge.Notifications, Bridge.CopyCodes, supported = bridgeExists ?? BridgeConfig.PlatformHasBridge },
+        // Home Assistant dashboard widget: the server's address, which the phone opens itself; the token stays here.
+        // Sent only while a page this phone shows has such a widget; with a .local name, its IP addresses to try too (HaAddress).
+        homeAssistant = PagesFor(deviceId).SelectMany(p => p.Widgets ?? []).SelectMany(w => new[] { w }.Concat(StackWidgets.Children(w)
+            .Select(c => new WidgetConfig { Type = c.Type }))).Any(w => w.Type == "hadash") ? new { url = HaAddress.ForPhone(HomeAssistant.Url), alternatives = HaAddress.Alternatives(HaAddress.ForPhone(HomeAssistant.Url)) } : null,
     };
 
 
@@ -222,7 +228,7 @@ public sealed class DisplayConfig
     public string Language { get; set; } = "auto";
     /// <summary>The codes the panel and the settings page are translated into (i18n.js). Casing matters for pt-BR:
     /// it is a distinct entry from pt, not a variant of it, so it must survive a save in this exact form.</summary>
-    internal static readonly string[] Languages = ["auto", "en", "tr", "de", "fr", "es", "it", "pt", "pt-BR", "nl", "pl", "ru", "el", "vi", "zh", "ja", "ko", "id", "th", "uk", "hi", "cs", "ar", "zh-Hant"];
+    internal static readonly string[] Languages = ["auto", "en", "tr", "de", "fr", "es", "it", "pt", "pt-BR", "ro", "nl", "pl", "ru", "el", "vi", "zh", "ja", "ko", "id", "th", "uk", "hi", "cs", "ar", "zh-Hant"];
     public bool ShowSeconds { get; set; } = true;
     public string WeekStart { get; set; } = "monday";
     /// <summary>false ("14:05", default), true ("2:05 PM") or "auto" (follow the phone).</summary>
@@ -403,6 +409,15 @@ public sealed class CursorConfig
     /// (needs the Cursor hook, see Settings › General). Cursor's hook runs before every command, also the ones it would
     /// run by itself, and waits for the phone while one is connected, so this stays off until you turn it on.</summary>
     public bool PhoneApprovals { get; set; }
+}
+
+public sealed class PiConfig
+{
+    /// <summary>Show recent Pi agent sessions on the AI sessions widget (off by default, like Cursor's).</summary>
+    public bool Sessions { get; set; }
+    /// <summary>Show each Pi session's title on the phone. The title is the name Pi wrote for the session, so it
+    /// stays off the phone until you turn it on, like Antigravity's.</summary>
+    public bool ShareSessionTitles { get; set; }
 }
 
 public sealed class AntigravityConfig
@@ -716,6 +731,23 @@ public sealed class Shortcut
     /// <summary>builtin:cycle: ids of the shortcuts to run one after another, a tap each; the key shows the one that ran last.</summary>
     public List<string>? Cycle { get; set; }
     public const int MaxCycle = 20;
+    /// <summary>
+    /// The number a Custom HTML page (<c>phonebox.run(id, value)</c>) or a script (<c>POST /api/run/{id}?value=</c>) may
+    /// send with a run, and its range. Only for keys that start a program or open an address; null = no value accepted.
+    /// </summary>
+    public ShortcutValue? Value { get; set; }
+}
+
+/// <summary>The range a shortcut's value must be in: from <see cref="Min"/> to <see cref="Max"/>, in steps of <see cref="Step"/> from Min.</summary>
+public sealed class ShortcutValue
+{
+    public double Min { get; set; }
+    public double Max { get; set; } = 100;
+    public double Step { get; set; } = 1;
+
+    // bounds that keep every value exact as a decimal and short as text: within ±1e12, at most 6 decimals
+    internal const double Limit = 1e12, MinStep = 1e-6;
+    internal const int Decimals = 6;
 }
 
 /// <summary>Reads/writes config.json; external edits are picked up on the next request.</summary>
@@ -948,6 +980,7 @@ public sealed partial class ConfigStore(string path)
             .Where(x => x.key is not null && x.key != defaultClaude)
             .DistinctBy(x => x.key).Select(x => x.d).DistinctBy(d => d.Label, StringComparer.OrdinalIgnoreCase).Take(10).ToArray();
         c.Cursor ??= new();
+        c.Pi ??= new();
         c.Antigravity ??= new();
         c.OpenCode ??= new();
         c.Bridge ??= new(); // a hand-edited "bridge": null must not break /api/config or the clipboard poll
@@ -1025,6 +1058,8 @@ public sealed partial class ConfigStore(string path)
             // a cycle key runs the next key, not a command of its own: an on / off setting would bypass the cycle
             if (s.Cmd == "builtin:cycle") { s.Toggle = false; s.StateKey = null; s.OffCmd = null; s.OffArgs = null; }
         }
+        // a value goes only to a key that starts a program or opens an address, and never to an on / off key
+        foreach (var s in c.Shortcuts) s.Value = ShortcutValues.Normalize(s);
         c.Phones = (c.Phones ?? []).Where(p => p is not null && !string.IsNullOrWhiteSpace(p.Id)).GroupBy(p => p.Id).Select(g => g.First()).Take(20).ToList();
         foreach (var ph in c.Phones)
         {

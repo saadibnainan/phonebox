@@ -150,6 +150,9 @@
       // bridge: the agent says whether this computer has a phone bridge (macOS) and whether its switch is on; the demo has
       // none, so only a config that sets it carries it (see bridge-overview.spec.js)
       ...(c.bridge ? { bridge: { clipboard: !!c.bridge.clipboard, supported: c.bridge.supported === true } } : {}),
+      // like the agent: the Home Assistant address (never the token), only while a page has a Home Assistant dashboard widget
+      homeAssistant: (c.pages || []).some((p) => (p.widgets || []).some((w) => w.type === 'hadash' || (w.type === 'stack' && (w.options?.widgets || []).some((x) => x.type === 'hadash')))) ? // like the agent: also a Smart Stack card
+        { url: c.homeAssistant?.url ?? null, alternatives: c.homeAssistant?.alternatives ?? [] } : null, // alternatives: what the agent finds for a .local name
     };
   }
 
@@ -248,6 +251,51 @@
 
   const toggles = {};
   let cycleLists = {}; // cycle key id -> its list now, as JSON
+  // ShortcutValues.Check in the agent, for the demo: why a number sent with a run is refused, or null. As exact as the
+  // agent's decimals: numbers are compared as whole counts of 10^-12.
+  function valueRefusal(sc, v, hold) {
+    const r = sc.value, cmd = String(sc.cmd || '').trim(), args = String(sc.args || '');
+    if (hold) return 'A long press takes no value.';
+    if (!r || sc.toggle || !cmd || /^builtin:/i.test(cmd)) return 'This shortcut takes no value.';
+    // an address (a scheme of two letters or more) takes the number only in place of {value} in the address; the demo
+    // has no files, so any other command counts as a program found on the computer
+    if (/^file:/i.test(cmd)) return 'This shortcut takes a number only when it starts a program or opens an address.';
+    const address = /^[A-Za-z][A-Za-z0-9+.\-]+:/.test(cmd);
+    if (address) { if (!cmd.includes('{value}')) return 'This shortcut opens an address, which takes no arguments.'; }
+    else if (cmd.includes('{value}')) return '{value} goes in the arguments of a program, not in its name.';
+    // where {value} stands in the arguments matters only for a program: an address takes the number in the address
+    let quoted = false, embedded = false;
+    for (let i = 0; !address && i < args.length; i++) {
+      if (args[i] === '"') { let n = 0; for (let j = i - 1; j >= 0 && args[j] === '\\'; j--) n++; if (n % 2 === 0) quoted = !quoted; }
+      else if (args.startsWith('{value}', i)) {
+        const end = i + 7;
+        if (quoted || (i > 0 && !/[ \t]/.test(args[i - 1])) || (end < args.length && !/[ \t]/.test(args[end]))) embedded = true;
+        i = end - 1;
+      }
+    }
+    if (embedded || quoted) return '{value} must be an argument of its own.';
+    if (!/^-?[0-9]{1,15}(\.[0-9]{1,12})?$/.test(v)) return 'The value must be a plain number.';
+    const scaled = (x) => { const [w, f = ''] = x.replace('-', '').split('.'); const n = BigInt(w + (f + '000000000000').slice(0, 12)); return x.startsWith('-') ? -n : n; };
+    // the range as the agent saves it (ShortcutValues.Normalize): finite, within ±1e12, ordered, step >= 0.000001, and
+    // rounded like .NET's Math.Round((decimal)x, 6): the double read as 15 significant digits, a tie to the even digit.
+    // (Bounds of 16 or more digits, which the agent's double then rounds once more, are not copied.)
+    const bound = (x) => {
+      const d = Number.isFinite(+x) ? Math.min(Math.max(+x, -1e12), 1e12) : 0;
+      if (d === 0) return 0n;
+      const [m, e] = d.toExponential(14).split('e'), digits = BigInt(m.replace(/[-.]/g, '')), p = +e - 14 + 20;
+      const n = p >= 0 ? digits * 10n ** BigInt(p) : digits / 10n ** BigInt(-p); // in 10^-20
+      const unit = 10n ** 14n, r = n % unit;
+      let q = n / unit;                                                              // in 10^-6
+      if (2n * r > unit || (2n * r === unit && q % 2n === 1n)) q += 1n;
+      return (m.startsWith('-') ? -q : q) * 1000000n;                                // in 10^-12, like scaled()
+    };
+    let min = bound(r.min ?? 0), max = bound(r.max ?? 100);
+    if (max < min) [min, max] = [max, min];
+    const s0 = +(r.step ?? 1), step = Number.isFinite(s0) && s0 > 0 ? bound(Math.max(s0, 0.000001)) : bound(1), n = scaled(v);
+    if (n < min || n > max) return 'The value is outside the range.';
+    if ((n - min) % step !== 0n) return 'The value is not on a step.';
+    return null;
+  }
   const cycles = {}, cyclePos = {}; // cycle keys: { target id, list } of the key that ran last, and its position in the list
   let muteKeys = ['mute']; // ids of the shortcuts whose command is builtin:mute; their state is the computer's
 
@@ -664,8 +712,16 @@
       // on / off keys flip in the demo; the mute key mutes the made-up computer
       const id = decodeURIComponent(path.slice(9)), shortcuts = (await config()).shortcuts;
       let sc = shortcuts.find((s) => s.id === id);
+      // ?hold=: read once, like the agent's bool binding ("True" is true), for the value check and the long press
+      const hold = (q.get('hold') || '').toLowerCase() === 'true';
+      // ?value=: only a key that starts a program or opens an address and has a range takes a number, inside it and on
+      // a step from its lowest; never with a long press (the agent's own check, ShortcutValues; no rate limit here)
+      if (sc && q.has('value')) {
+        const refused = valueRefusal(sc, q.get('value'), hold);
+        if (refused) return json({ error: refused }, 400);
+      }
       // ?hold=true runs the key's long-press shortcut instead (the agent resolves it; the phone sends only the held key's id)
-      if (sc && q.get('hold') === 'true') sc = sc.longPress && sc.longPress !== sc.id ? shortcuts.find((s) => s.id === sc.longPress) : null;
+      if (sc && hold) sc = sc.longPress && sc.longPress !== sc.id ? shortcuts.find((s) => s.id === sc.longPress) : null;
       if (!sc) return json({ title: 'An error occurred while processing your request.', status: 500, detail: 'unknown shortcut' }, 500);
       if (sc.cmd === 'builtin:cycle') {
         const list = JSON.stringify(sc.cycle || []), n = (sc.cycle || []).length;
@@ -880,6 +936,8 @@
       return obsAct(path.slice(9), q.get('scene')) ? json({ ok: true }) : json({ error: 'unknown action' }, 400);
     }
     if (path === '/api/ha/entities') return json({ configured: true, error: null, entities: Object.keys(ha).sort().map((id) => ({ id, name: ha[id].name, switchable: /^(light|switch|lock|scene)\./.test(id) })) });
+    if (path === '/api/ha/dashboards') return json({ configured: true, error: null, phoneUrl: (await config()).homeAssistant?.url || 'http://192.168.1.10:8123', views: [
+      { path: 'lovelace/0', name: 'Overview › Home' }, { path: 'desk-panel/home', name: 'Desk panel › Home' }, { path: 'desk-panel/climate', name: 'Desk panel › Climate' }] });
     if (path === '/api/ha/states') return json(haStates((q.get('ids') || '').split(',').filter(Boolean)));
     if (path.startsWith('/api/ha/toggle/') && method === 'POST') { haToggle(decodeURIComponent(path.slice(15))); return json({ ok: true }); }
     if (path.startsWith('/api/docker/') && method === 'POST') {
@@ -984,7 +1042,7 @@
       lastCheck: now() - 3600e3, state: 'idle', error: null }, auto: (await config()).updates?.auto !== false, installed: true });
     if (path === '/api/stocks') return json({ quotes: [
       { code: 'sh000001', name: 'Shanghai Composite', price: 3375.21, change: 17.12, changePct: 0.51 },
-      { code: 'hk00700', name: 'Tencent', price: 410.8, change: -1.2, changePct: -0.29 },
+      { code: 'hk00700', name: '腾讯控股', englishName: 'TENCENT', price: 410.8, change: -1.2, changePct: -0.29 },
     ], updated: now() });
     if (path === '/api/stocks/minutes') {
       if (q.get('code') === 'sh000001') return json({

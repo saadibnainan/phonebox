@@ -169,6 +169,7 @@ W.crypto = {
 
 const stockText = source => I18n?.tc(source) ?? source;
 const quotePercent = n => (n > 0 ? '+' : '') + (n || 0).toFixed(2) + '%';
+const stockName = q => ((I18n?.getLang?.() || 'en').startsWith('zh') ? q.name : q.englishName || q.name) || q.code;
 
 W.stocks = {
   needs: ['tick'],
@@ -325,7 +326,7 @@ W.stocks = {
             head.style.cssText = 'display:flex;justify-content:space-between;padding:4px 6px 0;font-size:11px;white-space:nowrap;overflow:hidden';
             const canvas = h('canvas');
             canvas.style.cssText = 'flex:1;width:100%;height:100%;min-height:0;display:block';
-            const name = h('b', 'sc-name', q.name || q.code);
+            const name = h('b', 'sc-name', stockName(q));
             name.style.cssText = 'overflow:hidden;text-overflow:ellipsis';
             const pct = h('span', 'sc-pct', quotePercent(q.changePct));
             pct.style.color = quoteColor(q.changePct);
@@ -372,6 +373,43 @@ W.stocks = {
     box.append(h('div', 'w-title', stockText('Stocks'), status), list);
     const price = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 8 });
     let last = '';
+    // The shared .fx-i grid fixes the name track at 3.6em, room for about two CJK characters plus
+    // an ellipsis, so A-share names (上证指数, 深证成指) show truncated. --fx-name widens that one
+    // track to the longest name in the list; the numeric columns follow the grid, and a name that
+    // still does not fit keeps the ellipsis. Only this list sets the variable: exchange and crypto
+    // rows keep the CSS default (3.6em, 3.4em in a ≤260px widget).
+    const measurer = h('span', null, '');
+    measurer.style.cssText = 'position:absolute;left:-9999px;top:0;white-space:nowrap;visibility:hidden;pointer-events:none';
+    let trackDefault = 0; // the CSS default name track (px), read before the first fit touches it
+    const fitNameColumn = () => {
+      const rows = [...list.children].filter((el) => el.classList.contains('fx-i'));
+      if (!rows.length) return;
+      const first = rows[0];
+      const cs = getComputedStyle(first);
+      const cols = cs.gridTemplateColumns.trim().split(/\s+/);
+      const narrow = cols.length < 4; // ≤260px widget: the container query drops the change column
+      if (!trackDefault) trackDefault = parseFloat(cols[0]) || 0;
+      measurer.style.fontSize = cs.fontSize;
+      measurer.style.fontFamily = cs.fontFamily;
+      list.append(measurer);
+      let namePx = 0, pricePx = 0;
+      for (const row of rows) {
+        measurer.style.fontWeight = 700; // .fx-i b
+        measurer.textContent = row.firstChild.textContent;
+        namePx = Math.max(namePx, measurer.offsetWidth);
+        measurer.style.fontWeight = 500; // .fx-v
+        measurer.textContent = row.children[1].textContent;
+        pricePx = Math.max(pricePx, measurer.offsetWidth);
+      }
+      measurer.remove();
+      const font = parseFloat(cs.fontSize) || 13;
+      const gap = parseFloat(cs.columnGap) || 8;
+      const fixed = (narrow ? gap * 2 : gap * 3) + first.children[2].offsetWidth
+        + (narrow ? 0 : first.children[3].offsetWidth) + pricePx; // pct, change and price keep their room
+      const cap = Math.max(list.clientWidth - fixed - 4, font * 2); // never below today's ~2-character fallback
+      const nameCol = Math.min(Math.max(namePx + 2, Math.min(trackDefault || font * 3.6, cap)), cap);
+      list.style.setProperty('--fx-name', `${Math.max(0, Math.round(nameCol))}px`);
+    };
     const load = every(30_000, async () => {
       try {
         const d = await api('/stocks', 'GET', 6000);
@@ -385,7 +423,7 @@ W.stocks = {
         list.replaceChildren(...quotes.map((q) => {
           // up = red, down = green, flat = dim (A-share colours); the whole row takes the colour
           const col = quoteColor(q.changePct);
-          const name = h('b', null, q.name || q.code);
+          const name = h('b', null, stockName(q));
           name.style.cssText = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
           const pct = h('span', null, quotePercent(q.changePct));
           pct.style.cssText = 'font-weight:600;min-width:56px;text-align:right';
@@ -394,13 +432,16 @@ W.stocks = {
           row.style.color = col;
           return row;
         }));
+        fitNameColumn();
       } catch (_) {
         status.textContent = last ? staleText : '';
         if (!last) list.replaceChildren(h('div', 'empty', t('w.offline')));
         return false;
       }
     });
-    return { update: load };
+    const ro = new ResizeObserver(fitNameColumn);
+    ro.observe(list);
+    return { update: load, destroy() { ro.disconnect(); measurer.remove(); } };
   },
 };
 

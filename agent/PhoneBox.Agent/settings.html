@@ -881,6 +881,13 @@ nav a.on::before { color: var(--accent); }
       </div>
 
       <div class="card">
+        <h3 data-i18n="s.pi.title">Pi sessions</h3>
+        <p class="hint" style="margin:0 0 12px" data-i18n="s.pi.hint">Show recent Pi agent sessions on the AI sessions widget (off by default). Only session metadata and token counters are kept; prompts, replies and tool arguments are never shown, stored or sent.</p>
+        <div class="row" style="margin-bottom:8px"><label class="switch"><input type="checkbox" data-bind="pi.sessions" aria-labelledby="piSessionsLabel"><span></span></label> <span id="piSessionsLabel" data-i18n="s.pi.sessions">Show Pi sessions</span></div>
+        <label class="check"><input type="checkbox" data-bind="pi.shareSessionTitles"> <span data-i18n="s.pi.shareSessionTitles">Show Pi session titles on the phone (Pi writes a title for each session)</span></label>
+      </div>
+
+      <div class="card">
         <h3 data-i18n="s.antigravity.title">Antigravity sessions</h3>
         <p class="hint" style="margin:0 0 12px" data-i18n="s.antigravity.hint">Show recent Antigravity chats on the AI sessions widget (off by default). Only step metadata and token counters are kept; prompts, replies and tool arguments are never shown, stored or sent.</p>
         <div class="row" style="margin-bottom:8px"><label class="switch"><input type="checkbox" data-bind="antigravity.sessions" aria-labelledby="antigravitySessionsLabel"><span></span></label> <span id="antigravitySessionsLabel" data-i18n="s.antigravity.sessions">Show Antigravity sessions</span></div>
@@ -1063,6 +1070,7 @@ nav a.on::before { color: var(--accent); }
 <script src="../panel/locale-uk.js"></script>
 <script src="../panel/locale-hi.js"></script>
 <script src="../panel/locale-cs.js"></script>
+<script src="../panel/locale-ro.js"></script>
 <script src="../panel/locale-ar.js"></script>
 <script src="../panel/locale-zh-Hant.js"></script>
 <script src="../panel/locale-zz-night.js"></script>
@@ -2191,6 +2199,76 @@ function optionField(w, o, onValChange) {
       } }), rich(`${p.icon || ''} ${p.title || p.id}`.trim())))));
     }
     case 'ha-items': return haItemsEditor(w, o, set);
+    case 'ha-dashboard': {
+      // The dashboards and views Home Assistant lists, to pick from; "Another path…" takes any "dashboard/view". Under
+      // it: what the phone will open (the widget's own address, or the one the agent sends), and how to set it all up.
+      const OTHER = '\u0001other';
+      let value = String(v ?? '').trim(), views = [], answer = null, loaded = false;
+      const custom = h('input', { type: 'text', value, placeholder: 'dashboard/view', spellcheck: 'false', oninput: (e) => { value = e.target.value.trim(); set(o.key, value); opensLine(); } });
+      custom.hidden = true;
+      const select = h('select', { style: { flex: '1', minWidth: '0' }, onchange: (e) => {
+        if (e.target.value === OTHER) { custom.hidden = false; custom.focus(); return; }
+        custom.hidden = true; value = e.target.value; custom.value = value; set(o.key, value); opensLine();
+      } });
+      const status = h('div', { class: 'hint' });
+      const opens = h('div', { class: 'hint' });
+      // as the phone does: the widget's own address, or the one from Settings and then the addresses the computer found
+      // for a .local name (the first that answers on the phone is used)
+      const opensLine = () => {
+        const own = String(w.options?.address || '').trim();
+        const bases = (own ? [own] : [answer?.phoneUrl, ...(answer?.alternatives || [])]).filter(Boolean).map((b) => b.replace(/\/+$/, ''));
+        const page = '/' + (value.replace(/^\/+|\/+$/g, '') || 'lovelace') + (w.options?.kiosk !== false ? '?kiosk' : '');
+        opens.replaceChildren(...(bases.length ? [t('s.hadash.opens') + ': ', ...bases.flatMap((b, i) => [i ? ' · ' : '', h('code', {}, b + page)])] : []));
+      };
+      // Until Home Assistant answers, only the saved path shows (not "Another path…" with its field, which would flicker
+      // away once the list arrives).
+      const fill = () => {
+        if (!loaded) {
+          select.replaceChildren(h('option', { value }, value || t('s.hadash.pick')));
+          custom.hidden = true;
+          opensLine();
+          return;
+        }
+        const known = views.some((x) => x.path === value);
+        const pick = h('option', { value: '' }, t('s.hadash.pick'));
+        pick.disabled = true;
+        const other = h('option', { value: OTHER }, value && !known ? `${t('s.hadash.other')} ${value}` : t('s.hadash.other'));
+        select.replaceChildren(pick, ...views.map((x) => h('option', { value: x.path }, `${x.name} (${x.path})`)), other);
+        select.value = !value ? '' : known ? value : OTHER;
+        custom.hidden = !value || known;
+        opensLine();
+      };
+      const load = () => fetch('/api/ha/dashboards').then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      }).then((d) => {
+        answer = d; views = d.views || []; loaded = true;
+        status.textContent = d.configured === false ? t('s.hadash.noServer') : d.error || '';
+        fill();
+      }).catch(() => {
+        // the list stays as it was, with a line saying it could not be refreshed; Refresh tries again
+        loaded = true; status.textContent = t('s.phoneMic.setupFailed'); fill();
+      });
+      fill();
+      load();
+      // the widget's own address and the kiosk switch are other fields of the same inspector: follow the address as it
+      // is typed, and the switch on change (its own handler stores the value first, the event then bubbles up here)
+      queueMicrotask(() => {
+        const inspector = select.closest('.field')?.parentElement;
+        inspector?.addEventListener('input', opensLine);
+        inspector?.addEventListener('change', opensLine);
+      });
+      // what Home Assistant needs: two add-ons (from its Marketplace or HACS) and one setting
+      // configuration.yaml, not text to translate: two lines, as it is pasted
+      const FRAME_SETTING = ['http:', '  use_x_frame_options: false'].join('\n');
+      const link = (href, text) => h('a', { href, target: '_blank', rel: 'noopener' }, text);
+      const needs = h('ul', { style: { margin: '4px 0', paddingLeft: '18px' } },
+        h('li', {}, link('https://github.com/dancho12/ha-phonebox-embed', 'PhoneBox embed'), ' — ', t('s.hadash.embedWhat')),
+        h('li', {}, link('https://github.com/NemesisRE/kiosk-mode', 'kiosk-mode'), ' — ', t('s.hadash.kioskWhat')),
+        h('li', {}, h('pre', { style: { margin: '2px 0', userSelect: 'all' } }, FRAME_SETTING), t('s.hadash.frameWhat')));
+      return field(h('div', { class: 'row', style: { gap: '8px' } }, select, h('button', { class: 'btn sm', onclick: load }, t('s.js.refresh'))), custom, status, opens,
+        h('div', { class: 'hint' }, t('s.hadash.help'), needs, link('https://github.com/ersinkoc/phonebox/blob/main/docs/HOME-ASSISTANT.md', t('s.hadash.guide'))));
+    }
     case 'steam-games': return steamGamesEditor(w, o, set);
     case 'plex-playlists': return plexPlaylistsEditor(w, o, set);
     case 'shortcuts': {
@@ -3384,6 +3462,7 @@ function actionFields(s, upd, text, cmdIn, preset) {
       s.cmd = k === 'run' ? '' : 'builtin:' + k;
       if (k !== 'macro') delete s.steps;
       if (k !== 'cycle') delete s.cycle; else s.cycle ??= [];
+      if (k !== 'run') delete s.value; // only a key that starts a program or opens an address takes a value
       if (k === 'cycle') s.toggle = false;
       s.args = null; s.cwd = null;
       changed(); renderEditor();
@@ -3421,8 +3500,23 @@ function actionFields(s, upd, text, cmdIn, preset) {
 
   const isMute = s.cmd === 'builtin:mute';
   if (kind !== 'cycle') fields.push(h('label', { class: 'check', style: { marginTop: '4px' } },
-    h('input', { type: 'checkbox', checked: !!s.toggle || isMute, disabled: isMute, onchange: (e) => { s.toggle = e.target.checked; changed(); renderEditor(); } }),
+    h('input', { type: 'checkbox', checked: !!s.toggle || isMute, disabled: isMute, onchange: (e) => { s.toggle = e.target.checked; if (s.toggle) delete s.value; changed(); renderEditor(); } }),
     isMute ? t('s.k.toggleLabelMute') : t('s.k.toggleLabel')));
+  if (kind === 'run' && !s.toggle) {
+    // the agent gives a number only to a key that starts a program or opens an address: a built-in command (lock,
+    // wake…), typed or picked as a preset, has no range
+    const box = h('div', {});
+    let shown = null;
+    const fill = () => {
+      const can = !/^\s*builtin:/i.test(s.cmd || '');
+      if (!can) delete s.value;
+      if (can !== shown) { shown = can; box.replaceChildren(...(can ? valueFields(s) : [])); }
+    };
+    cmdIn.addEventListener('input', fill);
+    preset.addEventListener('change', fill);
+    fill();
+    fields.push(box);
+  }
   if (s.toggle && !isMute) {
     fields.push(text('stateKey', t('s.k.stateKey'), 'e.g. teams-muted',
       tc('A value pushed to /api/push/<key> (true / on / 1 = on), or <key>=<value> to be on while the key holds that value. Without it the phone shows the state after each tap.')));
@@ -3435,6 +3529,22 @@ function actionFields(s, upd, text, cmdIn, preset) {
       h('option', { value: '' }, t('s.k.longPressNone')),
       ...others.map((o) => h('option', { value: o.id, selected: o.id === s.longPress }, o.label || o.id))),
     h('span', { class: 'hint' }, t('s.k.longPressHint'))));
+  return fields;
+}
+
+// A number sent with a run (phonebox.run(id, value) on a Custom HTML page, or POST /api/run/<id>?value=): off unless
+// the key gives a range. The agent checks the number against it and passes it as an argument of its own.
+function valueFields(s) {
+  const on = !!s.value;
+  const fields = [h('label', { class: 'check', style: { marginTop: '4px' } },
+    h('input', { type: 'checkbox', checked: on, onchange: (e) => { if (e.target.checked) s.value = { min: 0, max: 100, step: 1 }; else delete s.value; changed(); renderEditor(); } }),
+    t('s.k.valueTakes'))];
+  if (!on) return fields;
+  const num = (key, label) => h('div', { class: 'field' }, h('label', {}, label),
+    h('input', { type: 'number', step: 'any', class: 'technical-input', value: s.value[key] ?? '', 'aria-label': label,
+      oninput: (e) => { const v = e.target.value.trim(); if (v === '' || !Number.isFinite(Number(v))) delete s.value[key]; else s.value[key] = Number(v); changed(); } }));
+  fields.push(h('div', { class: 'row', style: { gap: '8px' } }, num('min', t('s.k.valueMin')), num('max', t('s.k.valueMax')), num('step', t('s.k.valueStep'))),
+    h('span', { class: 'hint' }, t('s.k.valueHint')), h('span', { class: 'hint' }, t('s.k.valueAddress')));
   return fields;
 }
 

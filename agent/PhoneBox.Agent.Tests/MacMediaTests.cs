@@ -8,6 +8,14 @@ using Xunit;
 
 public sealed class MacMediaTests
 {
+    [Theory]
+    [InlineData(new string[0], false)]                 // neither runs: no osascript at all
+    [InlineData(new[] { "Music" }, true)]
+    [InlineData(new[] { "Spotify" }, true)]
+    [InlineData(new[] { "Safari", "Mail" }, false)]
+    public void TheAppleScriptFallbackRunsOnlyWhileSpotifyOrMusicRuns(string[] running, bool expected) =>
+        Assert.Equal(expected, MediaMonitor.FallbackAppRunning(running.Contains));
+
     [Fact]
     public void SystemMetadataAdvancesFromTheReportedPositionAndStopsWhenPaused()
     {

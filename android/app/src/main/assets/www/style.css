@@ -1009,8 +1009,9 @@ html.beat-3 .sess.busy .st, html.beat-4 .sess.shell .st, html.beat-2 .sess.waiti
 .cl-i.done .cl-t { color: var(--muted); text-decoration: line-through; }
 
 /* ---------- battery, quota ring (dial widgets) ---------- */
-.w-html { padding: 0; }
-.w-html.bare-html { background: transparent; border-color: transparent; box-shadow: none; }
+.w-html, .w-hadash { padding: 0; }
+.w-html.bare-html, .w-hadash.bare-html { background: transparent; border-color: transparent; box-shadow: none; }
+.w.url-html { overflow: visible; border-radius: 0; }
 .w.pf { padding: 0; overflow: hidden; background: #000; }
 .pf-img { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 1s ease; }
 .pf-img.on { opacity: 1; }
@@ -1545,14 +1546,14 @@ html.beat-4 .w-onair.on .oa-sign { box-shadow: 0 0 34px rgba(239, 68, 68, .9); }
 .w-exchange, .w-crypto { padding: 9px 12px; display: flex; flex-direction: column; gap: 4px; --c: #34d399; }
 .w-crypto { --c: #f7931a; }
 .fx-list { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: space-evenly; gap: 2px; }
-.fx-i { display: grid; grid-template-columns: 3.6em minmax(0, 1fr) auto 28%; align-items: center; gap: 8px; font-size: clamp(11px, 7cqh, 15px); min-height: 0; }
+.fx-i { display: grid; grid-template-columns: var(--fx-name, 3.6em) minmax(0, 1fr) auto 28%; align-items: center; gap: 8px; font-size: clamp(11px, 7cqh, 15px); min-height: 0; }
 .fx-i b { font-weight: 700; color: var(--muted); }
 .fx-v { font-weight: 500; text-align: right; white-space: nowrap; }
 .chg { font-size: .8em; white-space: nowrap; font-weight: 600; }
 .chg.up { color: #4ade80; }
 .chg.down { color: #f87171; }
 .fx-sp { width: 100%; height: 22px; }
-@container (max-width: 260px) { .fx-i { grid-template-columns: 3.4em minmax(0, 1fr) auto; } .fx-sp { display: none; } }
+@container (max-width: 260px) { .fx-i { grid-template-columns: var(--fx-name, 3.4em) minmax(0, 1fr) auto; } .fx-sp { display: none; } }
 
 /* ---------- image ---------- */
 .w-image { background: #000; }

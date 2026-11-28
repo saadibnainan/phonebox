@@ -161,7 +161,20 @@ public sealed class MediaMonitor(ILogger<MediaMonitor> log) : BackgroundService
     {
         var system = ReadMacSystemMedia();
         _macSystemMedia = system.Item1 is not null;
-        return _macSystemMedia ? system : ReadMacAppleScript();
+        if (_macSystemMedia) return system;
+        // the fallback only answers while Spotify or Music runs; letting osascript find that out started a process on every
+        // reading, and on macOS each start leaves a WindowServer Mach port behind until the user logs out (#695)
+        return FallbackAppRunning(IsRunning) ? ReadMacAppleScript() : (null, "");
+    }
+
+    /// <summary>Whether an app the AppleScript fallback can read is running (checked in-process, no helper).</summary>
+    internal static bool FallbackAppRunning(Func<string, bool> isRunning) => isRunning("Spotify") || isRunning("Music");
+
+    private static bool IsRunning(string name)
+    {
+        var found = System.Diagnostics.Process.GetProcessesByName(name);
+        foreach (var p in found) p.Dispose();
+        return found.Length > 0;
     }
 
     internal (MediaSnapshot?, string) ReadMacSystemMedia(string? suppliedJson = null, DateTimeOffset? sampledAt = null)

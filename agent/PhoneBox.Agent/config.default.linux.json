@@ -30,6 +30,8 @@
   "discord": { "enabled": false, "clientId": null, "clientSecret": null, "allowControl": false, "screenShare": false, "chat": false },
   // Cursor agent chats on the AI sessions widget (off by default). Windows: "watchWsl" also reads the chats of projects opened over Remote - WSL, in the running distros (off by default). "phoneApprovals" sends the commands and MCP tool calls of the Cursor agent to the phone for Allow / Deny (needs the hook from Settings › General; off by default)
   "cursor": { "sessions": false, "watchWsl": false, "phoneApprovals": false },
+  // Pi agent sessions on the AI sessions widget (off by default); "shareSessionTitles" shows each session's Pi-written title
+  "pi": { "sessions": false, "shareSessionTitles": false },
   // Antigravity chats on the AI sessions widget (off by default)
   "antigravity": { "sessions": false, "shareSessionTitles": false },
   // Live Codex quotas read through the Codex CLI (off by default; Settings › General › AI quotas & CodexBar)
