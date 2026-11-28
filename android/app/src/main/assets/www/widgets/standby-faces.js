@@ -151,6 +151,7 @@ function vaporFace() {
 
   function set(s, animate) {
     if (!W) layout();
+    if (s === text && W) return; // the same time again: nothing to draw (StandBy calls this every second)
     prev = text; text = s;
     for (let i = 0; i < 4; i++) {
       if (prev[i] === s[i]) continue;

@@ -2265,3 +2265,28 @@ html body :is(.clock, .sbx-clock, .sbf, .t-val b, .g-val, .s-main b, .q-pct, .q-
   transition: left .9s var(--sb-ease), opacity .3s ease; }
 .sbx.with-media .sbx-tag { left: calc(var(--sb-edge) * .7); }
 .sbx.sbx-editing .sbx-tag { opacity: 0; }
+
+/* ---- local patch: StandBy performance pass ----
+   Frosted glass over pure black looks the same as a plain fill and cost a backdrop blur on every repaint: the pills and
+   the media panel keep their fill and border, only the colour editor (drawn over the clock) still blurs.
+   The album-art glow is now a small pre-blurred canvas stretched over the panel, without a CSS filter. */
+.sbx-focus, .sbx-ai, .sbx-media { -webkit-backdrop-filter: none; backdrop-filter: none; }
+.sbx-glass { inset: auto; left: -25%; top: -25%; width: 150%; height: 150%; filter: none; background: none; opacity: 0; transition: opacity .6s ease; }
+.sbx-glass.on { opacity: .42; }
+
+/* ---- local patch: StandBy night (red, like iOS StandBy's night mode) ---- */
+.sbx.sbx-night .sbx-focus, .sbx.sbx-night .sbx-ai { color: #b3261e; background: rgba(179, 38, 30, .08); border-color: rgba(179, 38, 30, .2); }
+.sbx.sbx-night .sbx-ai-ic, .sbx.sbx-night .sbx-ai-reset, .sbx.sbx-night .sbx-phase, .sbx.sbx-night .sbx-side, .sbx.sbx-night .sbx-side * { color: #b3261e !important; }
+.sbx.sbx-night .sbx-tag, .sbx.sbx-night .sbx-date { color: #b3261e !important; opacity: .6; }
+.sbx.sbx-night .sbx-ring .fg { stroke: #b3261e; }
+.sbx.sbx-night .sbx-ring .bg { stroke: rgba(179, 38, 30, .22); }
+.sbx.sbx-night .sbx-colon i { background: #b3261e !important; }
+.sbx.sbx-night .sbx-glass { display: none; }
+/* the media panel in red monochrome, dimmed (a filter here only repaints with the once-a-second progress) */
+.sbx.sbx-night.with-media .sbx-media { opacity: .6; background: rgba(179, 38, 30, .05); border-color: rgba(179, 38, 30, .18);
+  filter: grayscale(1) brightness(.55) sepia(1) hue-rotate(-50deg) saturate(9); }
+.sbx.sbx-night .sbf { filter: brightness(.6); }
+body:has(.sbx.sbx-night) #dots { opacity: .25; }
+
+/* ---- local patch: StandBy burn-in drift (standby.js steps --sbx-dx/--sbx-dy every 2 min) ---- */
+.sbx { transform: translate(var(--sbx-dx, 0), var(--sbx-dy, 0)); }
