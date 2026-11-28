@@ -274,7 +274,7 @@ W.standby = {
 
     // the row under the clock, spanning the clock's width: Focus | motive | AI usage
     const row = h('div', 'sbx-row', focusBtn, motiveEl, aiBtn);
-    const tag = h('div', 'sbx-tag'); tag.textContent = '#saad_inan';  // local patch: name tag, top-left corner, pixel font
+    const tag = h('div', 'sbx-tag'); tag.textContent = '@saad_inan';  // local patch: name tag, top-left corner, pixel font
     root.append(stage, row, mediaBox, editor, tag);
     box.append(root);
 
